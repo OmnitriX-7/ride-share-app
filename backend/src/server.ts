@@ -1,24 +1,31 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import connectDB from "./db/db"; // 1. Import the function
-
+import dotenv from 'dotenv';
 dotenv.config();
 
-const app = express();
+import app from './app';
+import { supabase } from './config/supabase'; // NO .ts extension here
 
-// 2. Call the connection function
-connectDB(); 
+const port = process.env.PORT || 5000;
 
-const p = process.env.PORT || 5000;
+const startServer = async () => {
+    try {
+        const { error } = await supabase
+            .from('users')
+            .select('count', { count: 'exact', head: true });
+        
+        if (error && 
+            error.code !== 'PGRST116' && 
+            error.message !== 'relation "users" does not exist'
+        ) {
+            throw error;
+        }
 
-app.use(cors());
-app.use(express.json());
+        console.log("✅ Supabase Connection: Verified.");
+        app.listen(port, () => {
+            console.log(`🚀 Server running at http://localhost:${port}`);
+        });
+    } catch (err) {
+        console.error("❌ Supabase Connection Failed:", err);
+    }
+};
 
-app.get("/", (req, res) => {
-    res.send("Ride Sharing API is Live!");
-});
-
-app.listen(p, () => {
-    console.log(`Server running on http://localhost:${p}`);
-});
+startServer();

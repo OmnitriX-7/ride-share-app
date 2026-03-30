@@ -1,9 +1,9 @@
-import { Router } from "express";
+import { Router } from 'express';
 
 const router = Router();
 
-router.get("/test", (req, res) => {
-    res.json({ message: "User route is working!" });
+router.get("/status", (req, res) => {
+    res.json({ status: "User Routes are Active" });
 });
 
 export default router;
