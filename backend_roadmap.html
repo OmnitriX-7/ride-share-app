@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ultra-Detailed Backend Architecture Blueprint</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root { --primary: #1a202c; --accent: #2563eb; --success: #059669; --border: #e2e8f0; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; color: #334155; background: #f8fafc; padding: 40px; }
+        .container { background: white; max-width: 1100px; margin: 0 auto; padding: 60px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .controls { text-align: center; margin-bottom: 30px; }
+        .btn { background: var(--accent); color: white; padding: 16px 32px; border: none; border-radius: 6px; cursor: pointer; font-size: 18px; font-weight: 600; transition: all 0.2s; }
+        .btn:hover { background: #1d4ed8; transform: translateY(-1px); }
+        h1 { font-size: 32px; color: var(--primary); text-align: center; border-bottom: 4px solid var(--accent); padding-bottom: 20px; margin-bottom: 40px; }
+        h2 { font-size: 24px; color: white; background: var(--primary); padding: 12px 20px; border-radius: 4px; margin-top: 40px; }
+        h3 { font-size: 20px; color: var(--accent); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-top: 30px; }
+        .logic-section { margin-bottom: 25px; padding: 20px; border: 1px solid var(--border); border-radius: 8px; background: #ffffff; }
+        .bullet-title { font-weight: 700; color: #1e293b; display: block; margin-top: 15px; }
+        .sub-detail { margin-left: 20px; font-size: 15px; color: #475569; }
+        ul { list-style-type: disc; margin-left: 20px; }
+        li { margin-bottom: 10px; }
+        .highlight { color: #b91c1c; font-weight: 600; }
+        .pro-note { background: #eff6ff; border-left: 4px solid var(--accent); padding: 15px; margin-top: 15px; font-style: italic; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <button class="btn" onclick="generatePDF()">📥 Download Ultra-Detailed Master Blueprint</button>
+    </div>
+
+    <div id="content" class="container">
+        <h1>Master Backend Logic: Full-Scale Ride-Sharing System</h1>
+
+        <h2>Phase 1: Identity & Authentication (The Security Layer)</h2>
+        <div class="logic-section">
+            <h3>1.1 User Registration Logic</h3>
+            <span class="bullet-title">Input Validation:</span>
+            <div class="sub-detail">The backend must utilize a validation schema (like Zod or Joi). It checks if the email is a valid string format, and if the password meets complexity requirements (e.g., min 8 chars, 1 uppercase, 1 symbol).</div>
+            
+            <span class="bullet-title">Supabase Profile Duplication Check:</span>
+            <div class="sub-detail">Before calling any Auth service, the Controller must query the <code>profiles</code> table. If a record with that email exists, the request is aborted with a <code>409 Conflict</code> error to prevent redundant data.</div>
+            
+            <span class="bullet-title">Hard-Coded Role Assignment:</span>
+            <div class="sub-detail">The logic must prevent a user from registering as both roles simultaneously with one ID. A conditional check <code>if (role !== 'Rider' && role !== 'Driver')</code> rejects the request. The role is then permanently locked to that UUID in the database.</div>
+            
+            <span class="bullet-title">Password Hashing:</span>
+            <div class="sub-detail">Passwords must never reach the DB in plain text. Use <code>bcrypt.hash()</code> in a <code>authUtils.ts</code> file. This ensures that even if the database is compromised, user accounts remain secure.</div>
+        </div>
+
+        <div class="logic-section">
+            <h3>1.2 Login & Session Logic</h3>
+            <span class="bullet-title">Hash Comparison:</span>
+            <div class="sub-detail">The backend retrieves the stored hash and uses <code>bcrypt.compare()</code> to verify the incoming password attempt.</div>
+            
+            <span class="bullet-title">Dual Token Generation:</span>
+            <div class="sub-detail">Logic issues an <strong>Access Token</strong> (JWT) for immediate API calls and a <strong>Refresh Token</strong>. This setup allows users to stay logged in without sending their password over the network repeatedly.</div>
+            
+            <span class="bullet-title">Authenticate Guard Middleware:</span>
+            <div class="sub-detail">A custom middleware function that intercepts every protected request. It pulls the token from the <code>Authorization: Bearer</code> header, verifies it, and attaches <code>req.user = decodedToken</code> so every route knows exactly who is making the request.</div>
+        </div>
+
+        <div class="logic-section">
+            <h3>1.3 Profile Logic & Media</h3>
+            <span class="bullet-title">Image Upload & Unique Filenaming:</span>
+            <div class="sub-detail">When a user uploads a profile picture, the logic must generate a unique filename (e.g., <code>user-id-timestamp.jpg</code>). It then streams the file to <strong>Supabase Storage</strong> and saves the returned <strong>Public URL</strong> into the user's row in the PostgreSQL <code>profiles</code> table.</div>
+        </div>
+
+        <h2>Phase 2: Driver Verification & Compliance (The Trust Layer)</h2>
+        <div class="logic-section">
+            <h3>2.1 Document Submission</h3>
+            <span class="bullet-title">Multipart Form Handling:</span>
+            <div class="sub-detail">Using middleware like <code>Multer</code>, the backend accepts multiple files (License, Insurance, RC). These are routed to specific folders in Supabase Storage buckets.</div>
+            
+            <span class="bullet-title">Default Pending State:</span>
+            <div class="sub-detail">The logic initializes every new driver with <code>is_verified = false</code> and <code>account_status = 'PENDING_APPROVAL'</code>.</div>
+        </div>
+
+        <div class="logic-section">
+            <h3>2.2 Admin Approval Flow</h3>
+            <span class="bullet-title">Verification Toggle:</span>
+            <div class="sub-detail">A protected <code>PATCH /admin/verify-driver</code> route only accessible to admin-role users. It toggles the <code>is_verified</code> boolean.</div>
+            
+            <span class="bullet-title">Logic Gate for Online Status:</span>
+            <div class="sub-detail">Inside the <code>Go Online</code> route, the logic <strong>must</strong> check: <code>if (!driver.is_verified) return Error("Account not verified")</code>. This prevents unverified drivers from appearing on the map.</div>
+        </div>
+
+        <div class="logic-section">
+            <h3>2.3 Vehicle Linking</h3>
+            <span class="bullet-title">Anti-Ghosting Logic:</span>
+            <div class="sub-detail">The backend ensures a 1:1 link between a Driver ID and a Vehicle ID. It checks if the License Plate is already active on another account to prevent fraudulent "Ghost" cars.</div>
+        </div>
+
+        <h2>Phase 3: Real-Time Movement & Geospatial (The Pulse)</h2>
+        <div class="logic-section">
+            <h3>3.1 Availability & Heartbeat</h3>
+            <span class="bullet-title">Availability Toggle:</span>
+            <div class="sub-detail">Updates the <code>is_available</code> boolean and <code>last_online</code> timestamp. This is the primary switch for the matching engine.</div>
+            
+            <span class="bullet-title">Optimized Location Updates:</span>
+            <div class="sub-detail">To save DB resources, the logic compares the <strong>new coordinates</strong> with the <strong>stored coordinates</strong>. It only updates the database if the distance moved is greater than 10 meters.</div>
+        </div>
+
+        <div class="logic-section">
+            <h3>3.2 Nearby Search (PostGIS)</h3>
+            <span class="bullet-title">Geospatial Query:</span>
+            <div class="sub-detail">Uses the <code>ST_DWithin</code> function in PostGIS to find drivers whose <code>location</code> point is within a specific radius of the Rider's <code>pickup</code> point.</div>
+            
+            <span class="bullet-title">Radius Expansion Logic:</span>
+            <div class="sub-detail">If the initial query (e.g., 2km) returns zero drivers, the logic automatically triggers a second query with a 5km radius to ensure the rider finds a car.</div>
+        </div>
+
+        <h2>Phase 4: Ride Lifecycle & State Machine (The Core)</h2>
+        <div class="logic-section">
+            <h3>4.1 Request & Ranking</h3>
+            <span class="bullet-title">Price Estimation:</span>
+            <div class="sub-detail">A Service calculates: <code>(Base_Fare) + (Distance_KM * Rate) + (Estimated_Minutes * Rate)</code>. This must be calculated server-side to prevent tampering.</div>
+            
+            <span class="bullet-title">Matching Algorithm:</span>
+            <div class="sub-detail">The backend ranks found drivers by a combined score of <strong>Distance</strong> and <strong>User Rating</strong>.</div>
+            
+            <span class="bullet-title">Socket Notification:</span>
+            <div class="sub-detail">Utilizing <code>Socket.io</code>, the backend emits a "NEW_RIDE_REQUEST" event specifically to the top 5 nearest drivers.</div>
+        </div>
+
+        <div class="logic-section">
+            <h3>4.2 Acceptance (The Race Condition)</h3>
+            <span class="bullet-title">Atomic Database Transaction:</span>
+            <div class="sub-detail">Crucial logic: Use <code>BEGIN</code> and <code>COMMIT</code>. The logic checks if <code>status === 'SEARCHING'</code>. If true, it updates to <code>ACCEPTED</code>. This ensures that even if 10 drivers click "Accept" at once, only <strong>one</strong> succeeds.</div>
+        </div>
+
+        <div class="logic-section">
+            <h3>4.3 Trip Security & Completion</h3>
+            <span class="bullet-title">OTP Handshake:</span>
+            <div class="sub-detail">Backend generates a 4-digit OTP. The <code>Start Trip</code> route requires this OTP. If <code>inputOTP === dbOTP</code>, the status moves to <code>ONGOING</code>.</div>
+            
+            <span class="bullet-title">Completion & Reset:</span>
+            <div class="sub-detail">When status hits <code>COMPLETED</code>, the backend automatically sets the driver's <code>is_available</code> back to <code>true</code> and triggers the payment calculation.</div>
+        </div>
+
+        <h2>Phase 5: Payments, Surge & Payouts (The Money)</h2>
+        <div class="logic-section">
+            <h3>5.1 Surge & Transactions</h3>
+            <span class="bullet-title">Surge Pricing Logic:</span>
+            <div class="sub-detail">Logic checks the <code>Request_Count / Available_Driver_Count</code> ratio in a 1km zone. If demand is > 2.0x supply, the price is multiplied by a surge factor.</div>
+            
+            <span class="bullet-title">Split Logic:</span>
+            <div class="sub-detail">The backend calculates the 80/20 split: <code>Platform_Fee = Total * 0.20</code> and <code>Driver_Pay = Total * 0.80</code>.</div>
+            
+            <span class="bullet-title">Wallet Management:</span>
+            <div class="sub-detail">Increments the driver's virtual wallet. Logic prevents "Payout" requests if the balance is below a minimum threshold.</div>
+        </div>
+
+        <h2>Phase 6: Post-Trip, Safety & Support</h2>
+        <div class="logic-section">
+            <h3>6.1 Safety & Feedback</h3>
+            <span class="bullet-title">Rating Recalculation:</span>
+            <div class="sub-detail">When a rating is saved, the logic triggers an average update: <code>(Sum of all star rows) / (Count of total rides)</code>.</div>
+            
+            <span class="bullet-title">Cancellation Penalty:</span>
+            <div class="sub-detail">If <code>ride.status === 'ACCEPTED'</code> and <code>time_passed > 5 mins</code>, the backend flags the rider's account for a "Cancellation Fee" on the next billing.</div>
+            
+            <span class="bullet-title">Emergency SOS:</span>
+            <div class="sub-detail">A high-priority route that immediately logs the ride ID, driver location, and rider info into a <code>security_alerts</code> table for instant admin visibility.</div>
+        </div>
+
+        <div class="pro-note">
+            <strong>Note for Implementation:</strong> Every "Logic" point above should be handled in a dedicated <strong>Controller</strong> or <strong>Service</strong>. Use <strong>PostgreSQL Transactions</strong> for any step involving money or status changes to maintain data integrity.
+        </div>
+    </div>
+
+    <script>
+        function generatePDF() {
+            const element = document.getElementById('content');
+            const opt = {
+                margin: 0.3,
+                filename: 'RideSharing_Ultra_Detailed_Blueprint.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+    </script>
+</body>
+</html>
