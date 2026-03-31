@@ -1,27 +1,29 @@
 import { Request, Response, NextFunction } from 'express';
 
 export const errMid = (err: any, req: Request, res: Response, nxt: NextFunction) => {
-  err.code = err.code || 500;
-  err.stat = err.stat || 'error';
+  const statusCode = err.code || 500;
+  const status = err.stat || 'error';
 
+  // In Development, we send everything for debugging
   if (process.env.NODE_ENV === 'development') {
-    res.status(err.code).json({
-      stat: err.stat,
-      err: err,
-      msg: err.message,
-      stk: err.stack
+    res.status(statusCode).json({
+      status: status,
+      message: err.message, 
+      error: err,
+      stack: err.stack
     });
   } else {
+    // In Production, we only send the message if it's an "Operational" error
     if (err.isOp) {
-      res.status(err.code).json({
-        stat: err.stat,
-        msg: err.message
+      res.status(statusCode).json({
+        status: status,
+        message: err.message
       });
     } else {
-      console.error('ERROR:', err);
+      console.error('INTERNAL ERROR:', err);
       res.status(500).json({
-        stat: 'error',
-        msg: 'Something went wrong'
+        status: 'error',
+        message: 'Something went wrong!'
       });
     }
   }
