@@ -1,17 +1,18 @@
 import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
+import uRts from './routes/user.routes';
+import { errMid } from './middleware/error.middleware';
+import { AppError } from './utils/AppError';
 
 const app = express();
 
-app.use(helmet());
-app.use(cors());
-app.use(morgan('dev'));
 app.use(express.json());
 
-app.get('/test', (req, res) => {
-    res.json({ message: "Backend is Live" });
+app.use('/api/users', uRts);
+
+app.all('*', (req, res, nxt) => {
+  nxt(new AppError(`Route ${req.originalUrl} not found`, 404));
 });
+
+app.use(errMid);
 
 export default app;

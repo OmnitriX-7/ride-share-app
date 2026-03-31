@@ -1,9 +1,8 @@
 import { Router } from 'express';
+import { reg } from '../controllers/auth.controller';
 
-const router = Router();
+const r = Router();
 
-router.get("/status", (req, res) => {
-    res.json({ status: "User Routes are Active" });
-});
+r.post('/reg', reg);
 
-export default router;
+export default r;
