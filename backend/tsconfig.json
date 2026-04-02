@@ -1,20 +1,19 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "NodeNext", 
+    "moduleResolution": "NodeNext", 
     "rootDir": "./src",
     "outDir": "./dist",
-    "baseUrl": "./",
     "paths": {
-      "@config/*": ["src/config/*"],
-      "@controllers/*": ["src/controllers/*"],
-      "@models/*": ["src/models/*"],
-      "@services/*": ["src/services/*"],
-      "@utils/*": ["src/utils/*"],
-      "@middleware/*": ["src/middleware/*"],
-      "@sockets/*": ["src/sockets/*"],
-      "@grpc/*": ["src/grpc/*"]
+      "@config/*": ["./src/config/*"],
+      "@controllers/*": ["./src/controllers/*"],
+      "@models/*": ["./src/models/*"],
+      "@services/*": ["./src/services/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@middleware/*": ["./src/middleware/*"],
+      "@sockets/*": ["./src/sockets/*"],
+      "@grpc/*": ["./src/grpc/*"]
     },
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -23,7 +22,8 @@
   },
   "ts-node": {
     "require": ["tsconfig-paths/register"],
-    "esm": false
+    "esm": false,
+    "transpileOnly": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
