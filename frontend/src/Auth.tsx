@@ -1,225 +1,272 @@
-import { useState } from 'react'
-import { supabase } from './supabaseClient'
+import { useState } from 'react';
+import { supabase } from './supabaseClient';
+import { useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, Car, Mail, Lock } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { validateEmail, validatePassword } from './utils/validation'; 
 
 export default function Auth() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [isLogin, setIsLogin] = useState(true)
-  const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLogin, setIsLogin] = useState(true);
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  const navigate = useNavigate();
 
   const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    setLoading(true)
-    setMessage('')
+    event.preventDefault();
+    setMessage('');
+
+    // 1. Client-side Validation (Frontend)
+    if (!validateEmail(email)) {
+      setMessage('Please enter a valid email address.');
+      return;
+    }
+
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.isValid) {
+      // Shows: Password must be at least 8 characters long and include an uppercase letter, a number, and a symbol.
+      setMessage(passwordCheck.message);
+      return;
+    }
 
     if (!isLogin && password !== confirmPassword) {
-      setMessage('Error: Passwords do not match')
-      setLoading(false)
-      return
+      setMessage('Passwords do not match.');
+      return;
     }
+
+    setLoading(true);
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: email,
-          password: password,
-        })
-        if (error) setMessage('Error: ' + error.message)
-        else setMessage('Success! You are logged in.')
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        if (error) {
+          setMessage('Error: ' + error.message);
+        } else {
+          setMessage('Login successful. Verifying...');
+          
+          try {
+            const response = await fetch('http://localhost:5000/api/users/profile', {
+              headers: { 'user-id': data.user.id }
+            });
+
+            const backendData = await response.json();
+
+            if (response.status === 403 && backendData.trap) {
+              navigate('/onboarding', { state: { userId: data.user.id } });
+            } else if (response.ok) {
+              navigate('/home');
+            } else {
+              setMessage('Error: Profile verification failed.');
+            }
+          } catch (backendErr) {
+            setMessage('Error: Backend unreachable. Check port 5000.');
+          }
+        }
       } else {
         const response = await fetch('http://localhost:5000/api/users/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password, confirmPassword })
-        })
+        });
 
-        const result = await response.json()
+        const result = await response.json();
 
         if (!response.ok) {
-          const errorMessage = result.message || 'Registration failed'
-          setMessage('Error: ' + errorMessage)
+          setMessage('Error: ' + (result.message || 'Registration failed'));
         } else {
-          setMessage('Registration Success! You can now log in.')
-          setIsLogin(true)
+          // --- REGISTRATION SUCCESS LOGIC ---
+          setMessage('Account created! Please sign in with your details.');
+          setIsLogin(true);
+          
+          // Clear all fields so Login page is fresh
+          setEmail('');
+          setPassword('');
+          setConfirmPassword('');
+          setShowPassword(false);
+          setShowConfirmPassword(false);
         }
       }
     } catch (err: any) {
-      setMessage('Network Error: Check if backend is running on port 5000')
+      setMessage('Error: Network connection failed.');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // Common styles for inputs to keep code clean
-  const inputStyle = {
+  const inputContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    position: 'relative'
+  };
+
+  const inputStyle: React.CSSProperties = {
     width: '100%',
-    padding: '12px 16px',
-    borderRadius: '10px',
-    border: '1px solid #e2e8f0',
-    fontSize: '15px',
+    padding: '12px 45px 12px 40px',
+    borderRadius: '12px',
+    border: '1.5px solid #e2e8f0',
+    fontSize: '14px',
     outline: 'none',
-    transition: 'border-color 0.2s, box-shadow 0.2s',
-    backgroundColor: '#f8fafc',
-    boxSizing: 'border-box' as const,
-  }
+    transition: 'all 0.2s ease',
+    backgroundColor: '#ffffff',
+    boxSizing: 'border-box',
+    color: '#1e293b'
+  };
+
+  const iconStyle: React.CSSProperties = {
+    position: 'absolute',
+    left: '12px',
+    top: '38px',
+    color: '#94a3b8',
+    pointerEvents: 'none'
+  };
 
   return (
     <div style={{ 
-      display: 'flex', 
-      justifyContent: 'center', 
-      alignItems: 'center', 
-      minHeight: '100vh', 
-      backgroundColor: '#f1f5f9', // Softer blue-grey background
-      fontFamily: '"Inter", "Segoe UI", sans-serif',
-      padding: '20px'
+      display: 'flex', justifyContent: 'center', alignItems: 'center', 
+      minHeight: '100vh', backgroundColor: '#f8fafc',
+      fontFamily: '"Inter", sans-serif', padding: '20px'
     }}>
-      <div style={{ 
-        backgroundColor: 'white', 
-        padding: '40px', 
-        borderRadius: '24px', 
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02)', 
-        width: '100%', 
-        maxWidth: '400px' 
-      }}>
-        
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h2 style={{ margin: '0 0 8px 0', color: '#0f172a', fontSize: '28px', fontWeight: '800', letterSpacing: '-0.5px' }}>
-            {isLogin ? 'Welcome Back' : 'Join the Ride'}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        style={{ 
+          backgroundColor: 'white', padding: '48px 40px', borderRadius: '28px', 
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 10px -6px rgba(0, 0, 0, 0.04)', 
+          border: '1px solid #f1f5f9', width: '100%', maxWidth: '440px' 
+        }}
+      >
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <div style={{ 
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: '60px', height: '60px', borderRadius: '18px', 
+            backgroundColor: '#eff6ff', color: '#2563eb', marginBottom: '20px'
+          }}>
+            <Car size={32} strokeWidth={2.5} />
+          </div>
+          <h2 style={{ margin: '0 0 8px 0', color: '#0f172a', fontSize: '26px', fontWeight: '800', letterSpacing: '-0.025em' }}>
+            {isLogin ? 'Welcome back' : 'Create an account'}
           </h2>
-          <p style={{ margin: 0, color: '#64748b', fontSize: '15px' }}>
-            {isLogin ? 'Enter your details to access your account' : 'Start your journey with us today'}
+          <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
+            {isLogin ? 'Enter your details to access CampusRide' : 'Join the most reliable campus network'}
           </p>
         </div>
         
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: '600', color: '#475569', marginLeft: '4px' }}>Email Address</label>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={inputContainerStyle}>
+            <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b' }}>Email Address</label>
+            <Mail size={18} style={iconStyle} />
             <input 
-              type="text" 
-              placeholder="name@example.com" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              required 
+              type="email" placeholder="" value={email} 
+              onChange={(e) => setEmail(e.target.value)} required 
               style={inputStyle}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#2563eb';
-                e.currentTarget.style.boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.1)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#2563eb'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
             />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: '600', color: '#475569', marginLeft: '4px' }}>Password</label>
+          <div style={inputContainerStyle}>
+            <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b' }}>Password</label>
+            <Lock size={18} style={iconStyle} />
             <input 
-              type="password" 
-              placeholder="••••••••" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              required 
+              type={showPassword ? "text" : "password"} placeholder=""
+              value={password} onChange={(e) => setPassword(e.target.value)} required 
               style={inputStyle}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#2563eb';
-                e.currentTarget.style.boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.1)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#2563eb'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
             />
+            <button 
+              type="button" onClick={() => setShowPassword(!showPassword)}
+              style={{ 
+                position: 'absolute', right: '14px', top: '36px',
+                background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8'
+              }}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
 
-          {!isLogin && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '14px', fontWeight: '600', color: '#475569', marginLeft: '4px' }}>Confirm Password</label>
-              <input 
-                type="password" 
-                placeholder="••••••••" 
-                value={confirmPassword} 
-                onChange={(e) => setConfirmPassword(e.target.value)} 
-                required 
-                style={inputStyle}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#2563eb';
-                  e.currentTarget.style.boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              />
-            </div>
-          )}
+          <AnimatePresence>
+            {!isLogin && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                style={inputContainerStyle}
+              >
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b' }}>Confirm Password</label>
+                <Lock size={18} style={iconStyle} />
+                <input 
+                  type={showConfirmPassword ? "text" : "password"} placeholder=""
+                  value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required 
+                  style={inputStyle}
+                />
+                <button 
+                  type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={{ 
+                    position: 'absolute', right: '14px', top: '36px',
+                    background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8'
+                  }}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <button 
-            type="submit" 
-            disabled={loading}
+            type="submit" disabled={loading}
             style={{ 
-              padding: '14px', 
-              borderRadius: '12px', 
-              border: 'none', 
-              backgroundColor: '#2563eb', 
-              color: 'white', 
-              fontSize: '16px', 
-              fontWeight: '600', 
-              cursor: loading ? 'not-allowed' : 'pointer', 
-              marginTop: '10px',
-              transition: 'all 0.2s',
-              boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)',
-              opacity: loading ? 0.7 : 1
+              padding: '14px', borderRadius: '12px', border: 'none', 
+              backgroundColor: '#0f172a', color: 'white', 
+              fontSize: '15px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', 
+              transition: 'all 0.2s ease', marginTop: '8px'
             }}
-            onMouseOver={(e) => { if(!loading) e.currentTarget.style.backgroundColor = '#1d4ed8' }}
-            onMouseOut={(e) => { if(!loading) e.currentTarget.style.backgroundColor = '#2563eb' }}
           >
-            {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
+            {loading ? 'Working...' : (isLogin ? 'Sign in' : 'Create account')}
           </button>
         </form>
 
         {message && (
-          <div style={{ 
-            marginTop: '24px', 
-            padding: '12px 16px', 
-            borderRadius: '12px', 
-            backgroundColor: message.includes('Error') ? '#fff1f2' : '#f0fdf4', 
-            color: message.includes('Error') ? '#e11d48' : '#16a34a', 
-            textAlign: 'center', 
-            fontSize: '14px', 
-            fontWeight: '500', 
-            border: '1px solid',
-            borderColor: message.includes('Error') ? '#ffe4e6' : '#dcfce7',
-            animation: 'fadeIn 0.3s ease-in'
-          }}>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            style={{ 
+              marginTop: '24px', padding: '12px', borderRadius: '10px', fontSize: '13px', textAlign: 'center', fontWeight: '500',
+              backgroundColor: message.includes('Error') || message.includes('match') || message.includes('at least') ? '#fef2f2' : '#f0fdf4', 
+              color: message.includes('Error') || message.includes('match') || message.includes('at least') ? '#b91c1c' : '#15803d', 
+              border: `1px solid ${message.includes('Error') || message.includes('match') || message.includes('at least') ? '#fee2e2' : '#dcfce7'}`
+            }}
+          >
             {message}
-          </div>
+          </motion.div>
         )}
 
-        <div style={{ marginTop: '32px', textAlign: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
-          <button 
-            onClick={() => { setIsLogin(!isLogin); setMessage(''); }}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: '#64748b', 
-              cursor: 'pointer', 
-              fontSize: '14px', 
-              fontWeight: '500',
-              transition: 'color 0.2s'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.color = '#0f172a'}
-            onMouseOut={(e) => e.currentTarget.style.color = '#64748b'}
-          >
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <span style={{ color: '#2563eb', fontWeight: '700' }}>
-              {isLogin ? "Sign up" : "Log in"}
-            </span>
-          </button>
+        <div style={{ marginTop: '32px', textAlign: 'center' }}>
+          <p style={{ fontSize: '14px', color: '#64748b' }}>
+            {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
+            <button 
+              onClick={() => { setIsLogin(!isLogin); setMessage(''); }}
+              style={{ 
+                background: 'none', border: 'none', color: '#2563eb', 
+                cursor: 'pointer', fontWeight: '600', padding: 0, marginLeft: '4px'
+              }}
+            >
+              {isLogin ? 'Sign up' : 'Log in'}
+            </button>
+          </p>
         </div>
-      </div>
+      </motion.div>
     </div>
-  )
+  );
 }

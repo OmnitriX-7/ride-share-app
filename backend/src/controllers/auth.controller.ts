@@ -4,25 +4,17 @@ import { catchAsync } from '../utils/catchAsync';
 import { AppError } from '../utils/AppError';
 
 export const register = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-  const { email, password, confirmPassword } = req.body;
+  const { email, password } = req.body;
 
-  if (!email || !password || !confirmPassword) {
-    return next(new AppError('Email, password, and confirm password are required', 400));
-  }
-
-  if (password !== confirmPassword) {
-    return next(new AppError('Passwords do not match', 400));
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    console.error(`Registration Blocked: Invalid Email Format (${email})`);
-    return next(new AppError('Please provide a valid email address', 400));
-  }
+  // The middleware has already guaranteed that:
+  // 1. email, password, and confirmPassword exist
+  // 2. password === confirmPassword
+  // 3. email format is valid
+  // 4. password meets strength requirements
 
   const { data, error } = await sb.auth.signUp({
-    email: email,
-    password: password,
+    email,
+    password,
   });
 
   if (error) {
