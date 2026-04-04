@@ -1,28 +1,44 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Car, Mail, Lock } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Eye, EyeOff, Car, Mail, Lock, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { validateEmail, validatePassword } from './utils/validation'; 
 
 export default function Auth() {
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLogin, setIsLogin] = useState(true);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [referredBy, setReferredBy] = useState<string | null>(null);
   
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
-  const navigate = useNavigate();
+
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) setReferredBy(ref);
+  }, [searchParams]);
+
+  const toggleAuthMode = () => {
+    setIsLogin(!isLogin);
+    setMessage('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (loading) return;
     setMessage('');
 
-    // 1. Client-side Validation (Frontend)
+    // Validation checks (These will now be RED)
     if (!validateEmail(email)) {
       setMessage('Please enter a valid email address.');
       return;
@@ -30,7 +46,6 @@ export default function Auth() {
 
     const passwordCheck = validatePassword(password);
     if (!passwordCheck.isValid) {
-      // Shows: Password must be at least 8 characters long and include an uppercase letter, a number, and a symbol.
       setMessage(passwordCheck.message);
       return;
     }
@@ -44,225 +59,187 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) setMessage('Error: ' + error.message);
+      } else {
+        const { error } = await supabase.auth.signUp({
           email,
           password,
+          options: { data: { referred_by: referredBy } }
         });
-        
+
         if (error) {
           setMessage('Error: ' + error.message);
         } else {
-          setMessage('Login successful. Verifying...');
-          
-          try {
-            const response = await fetch('http://localhost:5000/api/users/profile', {
-              headers: { 'user-id': data.user.id }
-            });
-
-            const backendData = await response.json();
-
-            if (response.status === 403 && backendData.trap) {
-              navigate('/onboarding', { state: { userId: data.user.id } });
-            } else if (response.ok) {
-              navigate('/home');
-            } else {
-              setMessage('Error: Profile verification failed.');
-            }
-          } catch (backendErr) {
-            setMessage('Error: Backend unreachable. Check port 5000.');
-          }
-        }
-      } else {
-        const response = await fetch('http://localhost:5000/api/users/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, confirmPassword })
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          setMessage('Error: ' + (result.message || 'Registration failed'));
-        } else {
-          // --- REGISTRATION SUCCESS LOGIC ---
-          setMessage('Account created! Please sign in with your details.');
-          setIsLogin(true);
-          
-          // Clear all fields so Login page is fresh
-          setEmail('');
-          setPassword('');
-          setConfirmPassword('');
-          setShowPassword(false);
-          setShowConfirmPassword(false);
+          // This specific string triggers the GREEN color
+          setMessage('Account created! Check your email to verify.');
+          setTimeout(() => toggleAuthMode(), 3000);
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       setMessage('Error: Network connection failed.');
     } finally {
       setLoading(false);
     }
   };
 
-  const inputContainerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-    position: 'relative'
-  };
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '12px 45px 12px 40px',
-    borderRadius: '12px',
-    border: '1.5px solid #e2e8f0',
-    fontSize: '14px',
-    outline: 'none',
-    transition: 'all 0.2s ease',
-    backgroundColor: '#ffffff',
-    boxSizing: 'border-box',
-    color: '#1e293b'
-  };
-
-  const iconStyle: React.CSSProperties = {
-    position: 'absolute',
-    left: '12px',
-    top: '38px',
-    color: '#94a3b8',
-    pointerEvents: 'none'
-  };
-
   return (
-    <div style={{ 
-      display: 'flex', justifyContent: 'center', alignItems: 'center', 
-      minHeight: '100vh', backgroundColor: '#f8fafc',
-      fontFamily: '"Inter", sans-serif', padding: '20px'
-    }}>
+    <div className="force-light" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '20px', backgroundColor: '#f8fafc' }}>
       <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, y: 20 }} 
+        animate={{ opacity: 1, y: 0 }} 
         style={{ 
-          backgroundColor: 'white', padding: '48px 40px', borderRadius: '28px', 
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 10px -6px rgba(0, 0, 0, 0.04)', 
-          border: '1px solid #f1f5f9', width: '100%', maxWidth: '440px' 
+          padding: '40px', borderRadius: '28px', width: '100%', maxWidth: '420px', 
+          backgroundColor: '#ffffff', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05)', 
+          border: '1px solid #f1f5f9' 
         }}
       >
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{ 
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: '60px', height: '60px', borderRadius: '18px', 
-            backgroundColor: '#eff6ff', color: '#2563eb', marginBottom: '20px'
-          }}>
-            <Car size={32} strokeWidth={2.5} />
+        <AnimatePresence>
+          {referredBy && !isLogin && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                backgroundColor: '#eff6ff', color: '#2563eb', padding: '12px', borderRadius: '12px',
+                fontSize: '13px', fontWeight: '700', textAlign: 'center', marginBottom: '24px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                border: '1px solid #dbeafe'
+              }}
+            >
+              <Sparkles size={16} /> Welcome Reward Active!
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '16px', backgroundColor: '#eff6ff', color: '#2563eb', marginBottom: '16px' }}>
+            <Car size={28} strokeWidth={2.5} />
           </div>
-          <h2 style={{ margin: '0 0 8px 0', color: '#0f172a', fontSize: '26px', fontWeight: '800', letterSpacing: '-0.025em' }}>
-            {isLogin ? 'Welcome back' : 'Create an account'}
+          <h2 style={{ margin: '0 0 8px 0', fontSize: '24px', fontWeight: '800', color: '#0f172a' }}>
+            {isLogin ? 'Welcome back' : 'Join CampusRide'}
           </h2>
-          <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-            {isLogin ? 'Enter your details to access CampusRide' : 'Join the most reliable campus network'}
+          <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
+            {isLogin ? 'Enter your credentials to continue' : 'Sign up to start saving on campus rides'}
           </p>
         </div>
         
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div style={inputContainerStyle}>
-            <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b' }}>Email Address</label>
-            <Mail size={18} style={iconStyle} />
-            <input 
-              type="email" placeholder="" value={email} 
-              onChange={(e) => setEmail(e.target.value)} required 
-              style={inputStyle}
-              onFocus={(e) => e.currentTarget.style.borderColor = '#2563eb'}
-              onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
-            />
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b' }}>Email</label>
+            <div style={{ position: 'relative' }}>
+              <Mail size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input 
+                type="email" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                required 
+                style={{ 
+                  width: '100%', padding: '12px 14px 12px 42px', borderRadius: '12px', 
+                  border: '1.5px solid #e2e8f0', outline: 'none', 
+                  color: '#1e293b', backgroundColor: '#ffffff' 
+                }} 
+              />
+            </div>
           </div>
 
-          <div style={inputContainerStyle}>
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b' }}>Password</label>
-            <Lock size={18} style={iconStyle} />
-            <input 
-              type={showPassword ? "text" : "password"} placeholder=""
-              value={password} onChange={(e) => setPassword(e.target.value)} required 
-              style={inputStyle}
-              onFocus={(e) => e.currentTarget.style.borderColor = '#2563eb'}
-              onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
-            />
-            <button 
-              type="button" onClick={() => setShowPassword(!showPassword)}
-              style={{ 
-                position: 'absolute', right: '14px', top: '36px',
-                background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8'
-              }}
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
+            <div style={{ position: 'relative' }}>
+              <Lock size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input 
+                type={showPassword ? "text" : "password"} 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                required 
+                style={{ 
+                  width: '100%', padding: '12px 44px 12px 42px', borderRadius: '12px', 
+                  border: '1.5px solid #e2e8f0', outline: 'none', 
+                  color: '#1e293b', backgroundColor: '#ffffff' 
+                }} 
+              />
+              <button 
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)} 
+                style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <AnimatePresence>
             {!isLogin && (
               <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                style={inputContainerStyle}
+                initial={{ opacity: 0, height: 0 }} 
+                animate={{ opacity: 1, height: 'auto' }} 
+                exit={{ opacity: 0, height: 0 }} 
+                style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px', overflow: 'hidden' }}
               >
                 <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b' }}>Confirm Password</label>
-                <Lock size={18} style={iconStyle} />
-                <input 
-                  type={showConfirmPassword ? "text" : "password"} placeholder=""
-                  value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required 
-                  style={inputStyle}
-                />
-                <button 
-                  type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  style={{ 
-                    position: 'absolute', right: '14px', top: '36px',
-                    background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8'
-                  }}
-                >
-                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  <input 
+                    type={showConfirmPassword ? "text" : "password"} 
+                    value={confirmPassword} 
+                    onChange={(e) => setConfirmPassword(e.target.value)} 
+                    required 
+                    style={{ 
+                      width: '100%', padding: '12px 44px 12px 42px', borderRadius: '12px', 
+                      border: '1.5px solid #e2e8f0', outline: 'none', 
+                      color: '#1e293b', backgroundColor: '#ffffff' 
+                    }} 
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)} 
+                    style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
 
           <button 
-            type="submit" disabled={loading}
+            type="submit" 
+            disabled={loading} 
             style={{ 
               padding: '14px', borderRadius: '12px', border: 'none', 
-              backgroundColor: '#0f172a', color: 'white', 
-              fontSize: '15px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', 
-              transition: 'all 0.2s ease', marginTop: '8px'
+              backgroundColor: '#0f172a', color: 'white', fontWeight: '700', 
+              cursor: loading ? 'not-allowed' : 'pointer',
+              marginTop: '10px'
             }}
           >
-            {loading ? 'Working...' : (isLogin ? 'Sign in' : 'Create account')}
+            {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
           </button>
         </form>
 
         {message && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            style={{ 
-              marginTop: '24px', padding: '12px', borderRadius: '10px', fontSize: '13px', textAlign: 'center', fontWeight: '500',
-              backgroundColor: message.includes('Error') || message.includes('match') || message.includes('at least') ? '#fef2f2' : '#f0fdf4', 
-              color: message.includes('Error') || message.includes('match') || message.includes('at least') ? '#b91c1c' : '#15803d', 
-              border: `1px solid ${message.includes('Error') || message.includes('match') || message.includes('at least') ? '#fee2e2' : '#dcfce7'}`
-            }}
-          >
+          <div style={{ 
+            marginTop: '24px', 
+            padding: '12px', 
+            borderRadius: '12px', 
+            fontSize: '13px', 
+            textAlign: 'center', 
+            fontWeight: '600',
+            /* SUCCESS LOGIC: Only show green for account creation */
+            backgroundColor: message.includes('Account created') ? '#f0fdf4' : '#fef2f2', 
+            color: message.includes('Account created') ? '#15803d' : '#b91c1c',
+            border: `1px solid ${message.includes('Account created') ? '#dcfce7' : '#fee2e2'}`
+          }}>
             {message}
-          </motion.div>
+          </div>
         )}
 
         <div style={{ marginTop: '32px', textAlign: 'center' }}>
           <p style={{ fontSize: '14px', color: '#64748b' }}>
-            {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
+            {isLogin ? "New to CampusRide?" : "Already have an account?"}
             <button 
-              onClick={() => { setIsLogin(!isLogin); setMessage(''); }}
-              style={{ 
-                background: 'none', border: 'none', color: '#2563eb', 
-                cursor: 'pointer', fontWeight: '600', padding: 0, marginLeft: '4px'
-              }}
+              onClick={toggleAuthMode} 
+              style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: '700', marginLeft: '6px' }}
             >
-              {isLogin ? 'Sign up' : 'Log in'}
+              {isLogin ? 'Sign Up' : 'Log In'}
             </button>
           </p>
         </div>

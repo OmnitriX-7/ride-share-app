@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 
 interface UserState {
-  hasProfile: boolean;
-  setHasProfile: (status: boolean) => void;
+  hasProfile: boolean | null;
+  setHasProfile: (status: boolean | null) => void;
 }
 
 export const useUserStore = create<UserState>((set) => ({
-  hasProfile: false, // Default state
+  hasProfile: null,
   setHasProfile: (status) => set({ hasProfile: status }),
 }));

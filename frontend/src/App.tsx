@@ -13,57 +13,77 @@ function App() {
   const [session, setSession] = useState<any>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
+  // Helper: Checks if the profile has a valid role assigned
   const checkProfileStatus = async (userId: string) => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
-        .single();
-      return !!data?.role;
-    } catch {
+        .maybeSingle(); 
+      
+      if (error) throw error;
+      // Profile is complete ONLY if role is 'rider' or 'driver'
+      return !!(data && (data.role === 'rider' || data.role === 'driver'));
+    } catch (err) {
+      console.error("Auth Check Error:", err);
       return false;
     }
   };
 
   useEffect(() => {
     const initApp = async () => {
-      // 1. Start fetching data immediately in the background
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      
-      if (session) {
-        const isComplete = await checkProfileStatus(session.user.id);
-        setHasProfile(isComplete);
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        setSession(initialSession);
+        
+        if (initialSession) {
+          const isComplete = await checkProfileStatus(initialSession.user.id);
+          setHasProfile(isComplete); 
+        } else {
+          setHasProfile(false);
+        }
+      } finally {
+        // Wait 3.2s to let the 3s car animation finish fully
+        setTimeout(() => {
+          setIsInitialLoading(false);
+        }, 3200); 
       }
-
-      // 2. FORCE the 3.2s delay for the animation to play fully
-      // This runs every time the component mounts (refresh or first visit)
-      setTimeout(() => {
-        setIsInitialLoading(false);
-      }, 3200);
     };
 
     initApp();
 
-    // Listener for Auth changes during the session
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      if (event === 'SIGNED_IN' && session) {
-        const isComplete = await checkProfileStatus(session.user.id);
-        setHasProfile(isComplete);
-      }
-      if (event === 'SIGNED_OUT') {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      if (event === 'SIGNED_IN') {
+        // 1. Immediately "close the curtain"
+        setHasProfile(null);
+        setSession(currentSession);
+
+        if (currentSession) {
+          // 2. Check status while the car is driving
+          const isComplete = await checkProfileStatus(currentSession.user.id);
+          
+          // 3. Lift curtain only after the 3s animation finishes
+          setTimeout(() => {
+            setHasProfile(isComplete);
+          }, 3000);
+        }
+      } 
+      else if (event === 'SIGNED_OUT') {
+        setSession(null);
         setHasProfile(false);
+      }
+      else {
+        setSession(currentSession);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [setHasProfile]);
 
-  // If initial loading is true, we ONLY show the loading screen
-  // This blocks the router until the car finishes its drive
-  if (isInitialLoading) {
+  // --- FLASH PROTECTOR ---
+  // Blocks the Router from rendering until we know EXACTLY where to send the user
+  if (isInitialLoading || (session && hasProfile === null)) {
     return <LoadingScreen />;
   }
 
@@ -71,23 +91,35 @@ function App() {
     <Router>
       <AnimatePresence mode="wait">
         <Routes>
-          {/* Landing Path */}
           <Route 
             path="/" 
-            element={!session ? <Auth /> : (hasProfile ? <Navigate to="/home" replace /> : <Navigate to="/onboarding" replace />)} 
+            element={
+              !session ? <Auth /> : (hasProfile === true ? <Navigate to="/home" replace /> : <Navigate to="/onboarding" replace />)
+            } 
           />
 
-          {/* Onboarding Path */}
+          <Route 
+            path="/auth" 
+            element={
+              !session ? <Auth /> : (hasProfile === true ? <Navigate to="/home" replace /> : <Navigate to="/onboarding" replace />)
+            } 
+          />
+
           <Route 
             path="/onboarding" 
-            element={session ? <OnboardingSurvey /> : <Navigate to="/" replace />} 
+            element={
+              session && hasProfile === false ? (
+                <OnboardingSurvey />
+              ) : (
+                <Navigate to={hasProfile === true ? "/home" : "/"} replace />
+              )
+            } 
           />
 
-          {/* Home Path with smooth entry animation */}
           <Route 
             path="/home" 
             element={
-              session && hasProfile ? (
+              session && hasProfile === true ? (
                 <motion.div 
                   key="home-content"
                   initial={{ opacity: 0 }} 
@@ -102,7 +134,15 @@ function App() {
             } 
           />
 
-          <Route path="*" element={<Navigate to={session ? (hasProfile ? "/home" : "/onboarding") : "/"} replace />} />
+          <Route 
+            path="*" 
+            element={
+              <Navigate 
+                to={!session ? "/" : (hasProfile === true ? "/home" : "/onboarding")} 
+                replace 
+              />
+            } 
+          />
         </Routes>
       </AnimatePresence>
     </Router>

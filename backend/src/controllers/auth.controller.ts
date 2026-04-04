@@ -4,17 +4,27 @@ import { catchAsync } from '../utils/catchAsync';
 import { AppError } from '../utils/AppError';
 
 export const register = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-  const { email, password } = req.body;
+  // 1. Destructure 'referredBy' along with email and password
+  const { email, password, referredBy } = req.body;
 
-  // The middleware has already guaranteed that:
-  // 1. email, password, and confirmPassword exist
-  // 2. password === confirmPassword
-  // 3. email format is valid
-  // 4. password meets strength requirements
+  // --- THE DEBUGGING TRACKERS ---
+  console.log("==== NEW REGISTRATION ATTEMPT ====");
+  console.log("1. Full Body Received:", req.body);
+  console.log("2. Extracted Email:", email);
+  console.log("3. Extracted Referred By ID:", referredBy);
+  console.log("==================================");
+  // ------------------------------
 
+  // 2. Pass 'referredBy' into the metadata so the SQL Trigger can see it
   const { data, error } = await sb.auth.signUp({
     email,
     password,
+    options: {
+      data: {
+        referred_by: referredBy, // This key MUST match what we used in the SQL Trigger
+        full_name: "New StateRider" 
+      }
+    }
   });
 
   if (error) {
@@ -23,7 +33,7 @@ export const register = catchAsync(async (req: Request, res: Response, next: Nex
   }
 
   if (data.user) {
-    console.log("User registered!", data.user.email);
+    console.log("User registered and referral tracked!", data.user.email);
   }
 
   res.status(201).json({

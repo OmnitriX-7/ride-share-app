@@ -7,13 +7,10 @@
   box-sizing: border-box;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   
-  /* High-end fluid transitions for Dark Mode toggle */
-  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
-              color 0.3s ease, 
-              border-color 0.3s ease,
-              box-shadow 0.3s ease;
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              color 0.2s ease, 
+              border-color 0.2s ease;
               
-  /* Removes the default mobile tap highlight */
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -21,143 +18,110 @@ body {
   background-color: #f8fafc;
   color: #0f172a;
   overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
 }
 
-/* 2. Professional Scrollbars (Thin & Elegant) */
-::-webkit-scrollbar {
-  width: 6px;
+/* --- 2. THE "FLASH-KILLER" & MAP DIMMING --- */
+.loading-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background-color: #ffffff;
+  z-index: 9999;
+  display: flex; justify-content: center; align-items: center;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+.dark .map-placeholder {
+  background-color: #0f172a !important;
+  filter: brightness(0.6) contrast(1.2) !important;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 10px;
+.dark .loading-overlay { background-color: #020617 !important; }
+
+/* 3. Global Button Style (RESTORED TO BLUE) */
+.search-btn {
+  background-color: #2563eb !important; 
+  color: #ffffff !important;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+.search-btn:hover {
+  background-color: #1d4ed8 !important;
 }
 
-/* --- 3. DARK MODE THEME --- */
-
-/* Root Level Background */
-.dark body {
-  background-color: #020617; /* Midnight Blue */
-  color: #f8fafc;
+/* --- 4. EXPLICIT PANEL & MENU STYLING --- */
+.panel-card, .menu-card {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
 }
 
-/* Navbar & Menu Specifics */
-.dark .logo-text, 
-.dark .text-main,
-.dark .menu-btn {
-  color: #ffffff !important; /* Pure white for maximum visibility */
-}
-
-.dark .logo-text span {
-  color: #3b82f6 !important; /* Lighter blue for dark backgrounds */
-}
-
-.dark .menu-card {
+.dark .panel-card, .dark .menu-card {
   background-color: #0f172a !important;
   border: 1px solid #1e293b !important;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
 }
 
-.dark .menu-header {
-  background-color: #1e293b !important;
+/* --- 5. FORCED LIGHT MODE (Fixes Invisible Login Text) --- */
+.force-light {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
 }
 
-.dark .menu-header div {
-  color: #ffffff !important;
+/* CRITICAL FIX: Ensures login text stays dark even when app is in Dark Mode */
+.force-light input, 
+.force-light select,
+.force-light .text-main {
+  background-color: #ffffff !important;
+  color: #0f172a !important; /* Forces black text */
+  border: 1.5px solid #e2e8f0 !important;
 }
 
-.dark .menu-btn:hover {
-  background-color: #1e293b !important;
+.force-light .text-secondary,
+.force-light p {
+  color: #64748b !important;
 }
 
-.dark .menu-btn svg {
-  color: #f8fafc !important;
-}
-
-/* Rider & Driver View Cards */
-.dark .panel-card, 
-.dark .driver-card,
-.dark .stats-card {
-  background-color: #0f172a !important;
-  border: 1px solid #1e293b !important;
-  color: #f8fafc !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Input Fields & Wrappers */
-.dark .input-wrapper {
-  background-color: #1e293b !important;
-  border: 1px solid #334155 !important;
-}
-
-.dark input {
-  background-color: transparent !important;
-  color: #ffffff !important; /* White text when typing */
-}
-
-.dark input::placeholder {
-  color: #94a3b8 !important; /* Clearer gray for placeholders */
-  opacity: 1;
-}
-
-.dark .icon-circle {
-  background-color: rgba(30, 41, 59, 0.7) !important;
-  border: 1px solid #334155 !important;
-}
-
-/* Map Background Dimming */
-.dark .map-placeholder {
-  background-color: #010409 !important;
-  filter: brightness(0.6) contrast(1.2);
-}
-
-/* Secondary Text / Subtitles */
-.dark .text-secondary {
+.force-light input::placeholder {
   color: #94a3b8 !important;
 }
 
-/* 4. Call-to-Action Buttons in Dark Mode */
-.dark .search-btn {
-  background-color: #2563eb !important; 
-  color: white !important;
-  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);
+/* --- 6. GLOBAL DARK MODE THEME --- */
+.dark, body.dark {
+  background-color: #020617 !important;
+  color: #ffffff !important;
 }
 
-.dark .search-btn:hover {
-  background-color: #3b82f6 !important;
-  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
+/* This rule only hits inputs NOT inside the login form */
+.dark input:not(.force-light input) {
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  border: 1px solid #334155 !important;
 }
 
-/* --- 5. LOGOUT BUTTON SPECIAL STYLING --- */
+.dark .text-main { color: #ffffff !important; }
+.dark .text-secondary { color: #94a3b8 !important; }
 
-/* Selects the last button in the menu list (Logout) */
-.menu-btn:last-child {
-  color: #ef4444 !important; /* Professional Red */
+/* --- 7. LOCATION UI COLORS --- */
+.loc-start { color: #10b981 !important; } 
+.dark .loc-start { color: #34d399 !important; } 
+
+.bg-loc-start { background-color: #f0fdf4 !important; border: 1px solid #dcfce7 !important; }
+.dark .bg-loc-start { 
+  background-color: rgba(52, 211, 153, 0.1) !important; 
+  border: 1px solid rgba(52, 211, 153, 0.2) !important; 
 }
 
-.menu-btn:last-child:hover {
-  background-color: #fef2f2 !important; /* Subtle red tint on hover */
+.loc-dest { color: #ef4444 !important; }
+.dark .loc-dest { color: #fb7185 !important; }
+
+.bg-loc-dest { background-color: #fef2f2 !important; border: 1px solid #fee2e2 !important; }
+.dark .bg-loc-dest { 
+  background-color: rgba(251, 113, 133, 0.1) !important; 
+  border: 1px solid rgba(251, 113, 133, 0.2) !important; 
 }
 
-/* Logout styling for Dark Mode */
-.dark .menu-btn:last-child {
-  color: #f87171 !important; /* Softer red for dark mode contrast */
-}
+.loc-line { border-left: 2px dashed #cbd5e1; }
+.dark .loc-line { border-left: 2px dashed #334155; }
 
-.dark .menu-btn:last-child:hover {
-  background-color: rgba(239, 68, 68, 0.1) !important; /* Deep red subtle tint */
-}
-
-/* Utility classes for quick styling */
+/* 8. Utilities */
 .text-main { color: #0f172a; }
 .text-secondary { color: #64748b; }

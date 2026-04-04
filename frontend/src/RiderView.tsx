@@ -1,75 +1,74 @@
 import React, { useState } from 'react';
-import { MapPin, Navigation } from 'lucide-react';
+import { Circle, MapPin, Search } from 'lucide-react';
 
 const RiderView = () => {
   const [pickup, setPickup] = useState('');
   const [destination, setDestination] = useState('');
 
   return (
-    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+    <div style={{ position: 'relative', height: '100vh', width: '100%', overflow: 'hidden' }}>
       
-      {/* 1. MAP BACKGROUND - Uses className for Dark Mode dimming */}
+      {/* 1. MAP BACKGROUND - Dims automatically via .dark .map-placeholder in CSS */}
       <div className="map-placeholder" style={mapPlaceholderStyle}>
         <div style={{ 
-          color: '#94a3b8', 
-          fontSize: '14px', 
-          letterSpacing: '1px', 
+          color: '#64748b', 
+          fontSize: '12px', 
+          letterSpacing: '2px', 
           textTransform: 'uppercase',
-          fontWeight: '700' 
+          fontWeight: '900' 
         }}>
-          [ Mapbox Engine Active ]
+          [ Map Engine Active ]
         </div>
       </div>
 
-      {/* 2. BOOKING PANEL (The Floating Card) */}
+      {/* 2. BOOKING PANEL - Pinned to the Left Side */}
       <div className="panel-card" style={panelStyle}>
-        <div style={{ marginBottom: '24px' }}>
-          <h2 className="text-main" style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 4px 0' }}>
+        <div style={{ marginBottom: '28px' }}>
+          <h2 className="text-main" style={{ fontSize: '24px', fontWeight: '900', margin: '0 0 4px 0', letterSpacing: '-0.5px' }}>
             Where to?
           </h2>
-          <p className="text-secondary" style={{ fontSize: '13px', margin: 0 }}>
-            Enter your destination for StateRide
+          <p className="text-secondary" style={{ fontSize: '14px', fontWeight: '500', margin: 0 }}>
+            Enter your destination for CampusRide
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative' }}>
           
-          {/* Pickup Input */}
-          <div className="input-wrapper" style={inputWrapperStyle}>
-            <div className="icon-circle" style={iconCircleStyle('#eff6ff')}>
-              <MapPin size={16} color="#2563eb" strokeWidth={2.5} />
+          {/* Pickup Input - .text-main ensures bright white text in dark mode */}
+          <div className="bg-loc-start" style={inputWrapperStyle}>
+            <div className="loc-start" style={iconStyle}>
+              <Circle size={10} fill="currentColor" strokeWidth={3} />
             </div>
             <input 
               placeholder="Current Location" 
               value={pickup} 
               onChange={(e) => setPickup(e.target.value)} 
+              className="text-main"
               style={inputStyle} 
             />
           </div>
 
           {/* Destination Input */}
-          <div className="input-wrapper" style={inputWrapperStyle}>
-            <div className="icon-circle" style={iconCircleStyle('#f0fdf4')}>
-              <Navigation size={16} color="#16a34a" strokeWidth={2.5} />
+          <div className="bg-loc-dest" style={inputWrapperStyle}>
+            <div className="loc-dest" style={iconStyle}>
+              <MapPin size={18} strokeWidth={2.5} />
             </div>
             <input 
               placeholder="Enter Destination" 
               value={destination} 
               onChange={(e) => setDestination(e.target.value)} 
+              className="text-main"
               style={inputStyle} 
             />
           </div>
 
-          {/* Decorative connector line between icons */}
-          <div style={connectorLineStyle} />
+          {/* Decorative connector dashed line - Style handled by .loc-line class */}
+          <div className="loc-line" style={connectorLineStyle} />
         </div>
 
-        <button 
-          style={confirmBtnStyle}
-          className="search-btn"
-          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}
-          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#0f172a'}
-        >
+        {/* This button stays Blue in both modes via .search-btn in CSS */}
+        <button className="search-btn" style={confirmBtnStyle}>
+          <Search size={18} style={{ marginRight: '8px' }} />
           Search Rides
         </button>
       </div>
@@ -80,10 +79,16 @@ const RiderView = () => {
 /* --- STYLES --- */
 
 const mapPlaceholderStyle: React.CSSProperties = {
-  position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
-  backgroundColor: '#cbd5e1', 
-  display: 'flex', justifyContent: 'center', alignItems: 'center',
-  transition: 'all 0.3s ease'
+  position: 'absolute', 
+  top: 0, 
+  left: 0, 
+  width: '100%', 
+  height: '100%', 
+  backgroundColor: '#e2e8f0', 
+  display: 'flex', 
+  justifyContent: 'center', 
+  alignItems: 'center',
+  transition: 'background-color 0.4s ease'
 };
 
 const panelStyle: React.CSSProperties = {
@@ -91,44 +96,57 @@ const panelStyle: React.CSSProperties = {
   top: '120px', 
   left: '40px', 
   width: '380px', 
-  backgroundColor: 'white', 
   borderRadius: '28px', 
   padding: '32px', 
-  boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)', 
   zIndex: 10,
-  transition: 'all 0.3s ease'
+  transition: 'transform 0.3s ease, background-color 0.3s ease'
 };
 
 const inputWrapperStyle: React.CSSProperties = {
   display: 'flex', 
   alignItems: 'center', 
-  gap: '12px', 
-  backgroundColor: '#f8fafc', 
-  padding: '14px', 
+  gap: '14px', 
+  padding: '16px', 
   borderRadius: '16px', 
-  border: '1px solid #f1f5f9',
-  transition: 'all 0.3s ease'
+  transition: 'all 0.2s ease',
+  border: '1.5px solid transparent' // Allows the CSS border-color to show
 };
 
-const iconCircleStyle = (bg: string): React.CSSProperties => ({
-  width: '32px', height: '32px', borderRadius: '10px', 
-  backgroundColor: bg, display: 'flex', justifyContent: 'center', alignItems: 'center'
-});
+const iconStyle: React.CSSProperties = {
+  width: '24px', 
+  display: 'flex', 
+  justifyContent: 'center'
+};
 
 const connectorLineStyle: React.CSSProperties = {
-  position: 'absolute', left: '30px', top: '48px', width: '2px', height: '24px', 
-  backgroundColor: '#e2e8f0', zIndex: -1
+  position: 'absolute', 
+  left: '27px', 
+  top: '48px', 
+  height: '24px', 
+  zIndex: 1
 };
 
 const inputStyle: React.CSSProperties = { 
-  border: 'none', background: 'transparent', outline: 'none', 
-  width: '100%', fontSize: '15px', fontWeight: '500'
+  border: 'none', 
+  background: 'transparent', 
+  outline: 'none', 
+  width: '100%', 
+  fontSize: '16px', 
+  fontWeight: '600'
 };
 
 const confirmBtnStyle: React.CSSProperties = {
-  width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#0f172a', 
-  color: 'white', fontWeight: '700', border: 'none', marginTop: '24px', 
-  cursor: 'pointer', transition: 'all 0.2s ease', fontSize: '16px'
+  width: '100%', 
+  padding: '18px', 
+  borderRadius: '16px', 
+  fontWeight: '800', 
+  border: 'none', 
+  marginTop: '24px', 
+  cursor: 'pointer', 
+  fontSize: '16px', 
+  display: 'flex', 
+  alignItems: 'center', 
+  justifyContent: 'center'
 };
 
 export default RiderView;

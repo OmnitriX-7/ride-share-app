@@ -1,16 +1,13 @@
-import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css'; 
 import LoadingScreen from './LoadingScreen'; 
-import { useUserStore } from './store'; // Import the Zustand store
+import { useUserStore } from './store'; 
+import { supabase } from './supabaseClient';
 
 export default function OnboardingSurvey() {
-  const location = useLocation();
   const navigate = useNavigate();
-  const userId = location.state?.userId;
-
-  // Zustand: Get the setter to update global state
   const setHasProfile = useUserStore((state) => state.setHasProfile);
 
   const [step, setStep] = useState(1);
@@ -20,19 +17,14 @@ export default function OnboardingSurvey() {
   const [statusMessage, setStatusMessage] = useState('');
   const [error, setError] = useState('');
 
-  // Protect the route if userId is missing (user didn't come from Auth)
-  if (!userId) {
-    navigate('/');
-    return null;
-  }
-
-  // --- VALIDATION LOGIC ---
+  // We don't need a profile check here because App.tsx already 
+  // acts as the gatekeeper. If the user is here, they need a profile.
 
   const validateName = () => {
     if (!fullname.trim()) return false;
     const isCapitalized = /^[A-Z]/.test(fullname.trim());
     if (!isCapitalized) {
-      setError("Name must start with a Capital letter.");
+      setError("Please capitalize the first letter of your name.");
       return false;
     }
     setError("");
@@ -56,38 +48,33 @@ export default function OnboardingSurvey() {
 
   const handleSubmit = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/users/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: userId,
-          fullname: fullname.trim(),
-          phoneNo, 
-          role
-        }),
+      // 1. Show the Car Animation immediately
+      setStatusMessage('loading');
+
+      // 2. Call the SQL Function
+      const { error: rpcError } = await supabase.rpc('complete_onboarding', {
+        user_full_name: fullname.trim(),
+        user_phone: phoneNo,
+        user_role: role
       });
 
-      if (response.ok) {
-        // 1. Trigger Global State Update (The Zustand Magic)
-        // This tells App.tsx immediately that the user now has a profile
-        setHasProfile(true);
-
-        // 2. Set UI status to loading for the Car Animation
-        setStatusMessage('loading'); 
-        
-        // 3. Wait for animation then navigate home
-        setTimeout(() => {
-          navigate('/home');
-        }, 3200); 
-      } else {
+      if (rpcError) {
+        console.error("Onboarding Error:", rpcError.message);
         setStatusMessage('Error saving profile. Please try again.');
+        return;
       }
+
+      // 3. WAIT for the car animation to reach the finish line (3.2 seconds)
+      setTimeout(() => {
+        // 4. Update Zustand. App.tsx will see this and move user to /home
+        setHasProfile(true);
+      }, 3200); 
+
     } catch (err) {
+      console.error('Submission error:', err);
       setStatusMessage('Network error occurred.');
     }
   };
-
-  // --- CONDITIONAL RENDERING ---
 
   if (statusMessage === 'loading') {
     return <LoadingScreen />;
@@ -95,42 +82,56 @@ export default function OnboardingSurvey() {
 
   if (statusMessage && statusMessage !== 'loading') {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f1f5f9' }}>
-        <h2 style={{ color: '#ef4444', fontSize: '24px', fontWeight: 'bold' }}>{statusMessage}</h2>
+      <div className="force-light" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f8fafc' }}>
+        <div style={{ textAlign: 'center', padding: '30px', background: 'white', borderRadius: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+          <h2 style={{ color: '#ef4444', fontSize: '20px', fontWeight: '800', marginBottom: '16px' }}>{statusMessage}</h2>
+          <button 
+            onClick={() => setStatusMessage('')} 
+            style={{ padding: '12px 24px', borderRadius: '12px', cursor: 'pointer', border: '1.5px solid #e2e8f0', backgroundColor: 'white', fontWeight: '700' }}
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f1f5f9', padding: '20px', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ backgroundColor: 'white', padding: '40px', borderRadius: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px' }}>
+    <div className="force-light" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f8fafc', padding: '20px' }}>
+      <div style={{ backgroundColor: 'white', padding: '40px', borderRadius: '28px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.04)', width: '100%', maxWidth: '400px', border: '1px solid #f1f5f9' }}>
         
-        {/* Progress Bar */}
-        <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '10px', marginBottom: '30px', overflow: 'hidden' }}>
-          <div style={{ width: `${(step / 3) * 100}%`, height: '100%', backgroundColor: '#2563eb', transition: 'width 0.3s ease' }} />
+        {/* Progress bar stays in sync with steps */}
+        <div style={{ width: '100%', height: '6px', backgroundColor: '#f1f5f9', borderRadius: '10px', marginBottom: '32px', overflow: 'hidden' }}>
+          <div style={{ width: `${(step / 3) * 100}%`, height: '100%', backgroundColor: '#2563eb', transition: 'width 0.5s cubic-bezier(0.16, 1, 0.3, 1)' }} />
         </div>
 
-        {error && <p style={{ color: '#ef4444', fontSize: '14px', marginBottom: '10px', textAlign: 'center', fontWeight: '500' }}>{error}</p>}
+        {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '16px', textAlign: 'center', fontWeight: '600' }}>{error}</p>}
 
         {step === 1 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h2 style={{ color: '#0f172a', fontSize: '22px', fontWeight: 'bold', textAlign: 'center' }}>What is your full name?</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <h2 style={{ color: '#0f172a', fontSize: '24px', fontWeight: '800', marginBottom: '8px' }}>Your Name</h2>
+              <p style={{ color: '#64748b', fontSize: '14px' }}>How should we address you?</p>
+            </div>
             <input
               type="text"
               value={fullname}
               onChange={(e) => { setFullname(e.target.value); setError(''); }}
-              placeholder="e.g. John Doe"
-              style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '15px', outline: 'none', backgroundColor: '#f8fafc', boxSizing: 'border-box' }}
+              placeholder="Full Name"
+              style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', fontSize: '15px', outline: 'none', backgroundColor: '#f8fafc', boxSizing: 'border-box', color: '#1e293b' }}
             />
-            <button onClick={handleNext} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: 'none', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>
+            <button onClick={handleNext} style={{ width: '100%', padding: '16px', borderRadius: '14px', border: 'none', backgroundColor: '#0f172a', color: 'white', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s' }}>
               Continue
             </button>
           </div>
         )}
 
         {step === 2 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h2 style={{ color: '#0f172a', fontSize: '22px', fontWeight: 'bold', textAlign: 'center' }}>Contact Details</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <h2 style={{ color: '#0f172a', fontSize: '24px', fontWeight: '800', marginBottom: '8px' }}>Phone Number</h2>
+              <p style={{ color: '#64748b', fontSize: '14px' }}>Used for ride coordination</p>
+            </div>
             <div className="phone-container">
               <PhoneInput
                 international
@@ -140,54 +141,59 @@ export default function OnboardingSurvey() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  padding: '12px 16px',
-                  borderRadius: '10px',
-                  border: '1px solid #e2e8f0',
+                  padding: '14px 16px',
+                  borderRadius: '12px',
+                  border: '1.5px solid #e2e8f0',
                   backgroundColor: '#f8fafc'
                 }}
               />
             </div>
-            <button onClick={handleNext} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: 'none', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>
+            <button onClick={handleNext} style={{ width: '100%', padding: '16px', borderRadius: '14px', border: 'none', backgroundColor: '#0f172a', color: 'white', fontWeight: '700', cursor: 'pointer' }}>
               Verify & Continue
             </button>
           </div>
         )}
 
         {step === 3 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h2 style={{ color: '#0f172a', fontSize: '22px', fontWeight: 'bold', textAlign: 'center' }}>Final Step: Your Role</h2>
-            <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <h2 style={{ color: '#0f172a', fontSize: '24px', fontWeight: '800', marginBottom: '8px' }}>I want to...</h2>
+              <p style={{ color: '#64748b', fontSize: '14px' }}>You can change this later</p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
               <button 
                 onClick={() => setRole('rider')} 
                 style={{ 
-                  flex: 1, padding: '20px', borderRadius: '12px', 
-                  border: role === 'rider' ? '2px solid #2563eb' : '2px solid #e2e8f0', 
+                  flex: 1, padding: '24px 16px', borderRadius: '16px', 
+                  border: role === 'rider' ? '2.5px solid #2563eb' : '1.5px solid #e2e8f0', 
                   backgroundColor: role === 'rider' ? '#eff6ff' : 'white', 
-                  fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' 
+                  color: role === 'rider' ? '#2563eb' : '#64748b',
+                  fontWeight: '800', cursor: 'pointer', transition: 'all 0.2s', fontSize: '15px'
                 }}
               >
-                🚗 Rider
+                Rider
               </button>
               <button 
                 onClick={() => setRole('driver')} 
                 style={{ 
-                  flex: 1, padding: '20px', borderRadius: '12px', 
-                  border: role === 'driver' ? '2px solid #2563eb' : '2px solid #e2e8f0', 
+                  flex: 1, padding: '24px 16px', borderRadius: '16px', 
+                  border: role === 'driver' ? '2.5px solid #2563eb' : '1.5px solid #e2e8f0', 
                   backgroundColor: role === 'driver' ? '#eff6ff' : 'white', 
-                  fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' 
+                  color: role === 'driver' ? '#2563eb' : '#64748b',
+                  fontWeight: '800', cursor: 'pointer', transition: 'all 0.2s', fontSize: '15px'
                 }}
               >
-                🛠️ Driver
+                Driver
               </button>
             </div>
             <button 
               onClick={handleSubmit} 
               disabled={!role} 
               style={{ 
-                padding: '14px', borderRadius: '12px', border: 'none', 
+                padding: '16px', borderRadius: '14px', border: 'none', 
                 backgroundColor: role ? '#16a34a' : '#94a3b8', 
-                color: 'white', fontWeight: 'bold', 
-                cursor: role ? 'pointer' : 'not-allowed', marginTop: '10px' 
+                color: 'white', fontWeight: '800', 
+                cursor: role ? 'pointer' : 'not-allowed', marginTop: '8px', transition: 'all 0.2s'
               }}
             >
               Complete Setup
@@ -204,9 +210,11 @@ export default function OnboardingSurvey() {
           font-size: 15px !important;
           margin-left: 10px;
           width: 100%;
+          color: #1e293b !important;
         }
-        .PhoneInputCountry {
-          margin-right: 5px;
+        .PhoneInputCountryIcon {
+          width: 24px !important;
+          height: 18px !important;
         }
       `}</style>
     </div>
