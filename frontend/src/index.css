@@ -1,127 +1,91 @@
 /* 1. Global Modern Font & Resets */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
+:root {
+  --bg-main: #f8fafc;
+  --card-bg: #ffffff;
+  --text-main: #0f172a;
+  --text-secondary: #64748b;
+  --border-subtle: #e2e8f0;
+  --input-bg: #ffffff; /* Changed slightly to stand out from bg-main */
+  --accent-primary: #2563eb;
+  --accent-hover: #1d4ed8;
+}
+
+/* 2. Global Dark Mode Overrides */
+.dark, body.dark {
+  --bg-main: #020617 !important;
+  --card-bg: #0f172a !important;
+  --text-main: #f8fafc !important;
+  --text-secondary: #94a3b8 !important;
+  --border-subtle: #1e293b !important;
+  --input-bg: #1e293b !important;
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  
-  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-              color 0.2s ease, 
-              border-color 0.2s ease;
-              
+  font-family: 'Inter', sans-serif;
+  /* Sync background and text transitions so they don't ghost */
+  transition: background-color 0.3s ease, color 0.2s ease, border-color 0.2s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
+/* 3. The Core Background Fix */
 body {
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: var(--bg-main) !important;
+  color: var(--text-main) !important;
   overflow-x: hidden;
   min-height: 100vh;
 }
 
-/* --- 2. THE "FLASH-KILLER" & MAP DIMMING --- */
-.loading-overlay {
-  position: fixed;
-  top: 0; left: 0; width: 100vw; height: 100vh;
-  background-color: #ffffff;
-  z-index: 9999;
-  display: flex; justify-content: center; align-items: center;
+#root, .home-wrapper {
+  background-color: var(--bg-main) !important;
+  min-height: 100vh;
 }
 
-.dark .map-placeholder {
-  background-color: #0f172a !important;
-  filter: brightness(0.6) contrast(1.2) !important;
-}
-
-.dark .loading-overlay { background-color: #020617 !important; }
-
-/* 3. Global Button Style (RESTORED TO BLUE) */
+/* --- 4. THE BUTTON FIX (Fixes invisible text) --- */
 .search-btn {
-  background-color: #2563eb !important; 
-  color: #ffffff !important;
+  background-color: var(--accent-primary) !important;
+  color: #ffffff !important; /* Forces text to stay white always */
+  font-weight: 700 !important;
+  border: none !important;
+  cursor: pointer;
 }
 
 .search-btn:hover {
-  background-color: #1d4ed8 !important;
+  background-color: var(--accent-hover) !important;
 }
 
-/* --- 4. EXPLICIT PANEL & MENU STYLING --- */
+/* --- 5. THE INPUT FIX (Fixes background mismatch) --- */
+input, select, textarea {
+  background-color: var(--input-bg) !important;
+  color: var(--text-main) !important;
+  border: 1.5px solid var(--border-subtle) !important;
+  outline: none;
+}
+
+input::placeholder {
+  color: var(--text-secondary) !important;
+  opacity: 0.7;
+}
+
+/* --- 6. MISC COMPONENTS --- */
 .panel-card, .menu-card {
-  background-color: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+  background-color: var(--card-bg) !important;
+  border: 1px solid var(--border-subtle) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  color: var(--text-main) !important;
 }
 
-.dark .panel-card, .dark .menu-card {
-  background-color: #0f172a !important;
-  border: 1px solid #1e293b !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+/* --- 7. PHONE INPUT FIX --- */
+.PhoneInputInput {
+  background: transparent !important;
+  color: var(--text-main) !important;
+  border: none !important;
 }
 
-/* --- 5. FORCED LIGHT MODE (Fixes Invisible Login Text) --- */
-.force-light {
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
+.PhoneInputCountrySelect {
+  color: var(--text-main) !important;
 }
-
-/* CRITICAL FIX: Ensures login text stays dark even when app is in Dark Mode */
-.force-light input, 
-.force-light select,
-.force-light .text-main {
-  background-color: #ffffff !important;
-  color: #0f172a !important; /* Forces black text */
-  border: 1.5px solid #e2e8f0 !important;
-}
-
-.force-light .text-secondary,
-.force-light p {
-  color: #64748b !important;
-}
-
-.force-light input::placeholder {
-  color: #94a3b8 !important;
-}
-
-/* --- 6. GLOBAL DARK MODE THEME --- */
-.dark, body.dark {
-  background-color: #020617 !important;
-  color: #ffffff !important;
-}
-
-/* This rule only hits inputs NOT inside the login form */
-.dark input:not(.force-light input) {
-  background-color: #1e293b !important;
-  color: #ffffff !important;
-  border: 1px solid #334155 !important;
-}
-
-.dark .text-main { color: #ffffff !important; }
-.dark .text-secondary { color: #94a3b8 !important; }
-
-/* --- 7. LOCATION UI COLORS --- */
-.loc-start { color: #10b981 !important; } 
-.dark .loc-start { color: #34d399 !important; } 
-
-.bg-loc-start { background-color: #f0fdf4 !important; border: 1px solid #dcfce7 !important; }
-.dark .bg-loc-start { 
-  background-color: rgba(52, 211, 153, 0.1) !important; 
-  border: 1px solid rgba(52, 211, 153, 0.2) !important; 
-}
-
-.loc-dest { color: #ef4444 !important; }
-.dark .loc-dest { color: #fb7185 !important; }
-
-.bg-loc-dest { background-color: #fef2f2 !important; border: 1px solid #fee2e2 !important; }
-.dark .bg-loc-dest { 
-  background-color: rgba(251, 113, 133, 0.1) !important; 
-  border: 1px solid rgba(251, 113, 133, 0.2) !important; 
-}
-
-.loc-line { border-left: 2px dashed #cbd5e1; }
-.dark .loc-line { border-left: 2px dashed #334155; }
-
-/* 8. Utilities */
-.text-main { color: #0f172a; }
-.text-secondary { color: #64748b; }

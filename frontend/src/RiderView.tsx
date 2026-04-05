@@ -8,10 +8,22 @@ const RiderView = () => {
   return (
     <div style={{ position: 'relative', height: '100vh', width: '100%', overflow: 'hidden' }}>
       
-      {/* 1. MAP BACKGROUND - Dims automatically via .dark .map-placeholder in CSS */}
+      {/* 1. COMPONENT STYLES - Protects these inputs from global index.css rules */}
+      <style>{`
+        .rider-search-input {
+          background: transparent !important;
+          border: none !important;
+          color: var(--text-main) !important;
+        }
+        .rider-search-input::placeholder {
+          color: var(--text-secondary) !important;
+        }
+      `}</style>
+
+      {/* 2. MAP BACKGROUND - Now dynamically uses CSS Variables */}
       <div className="map-placeholder" style={mapPlaceholderStyle}>
         <div style={{ 
-          color: '#64748b', 
+          color: 'var(--text-secondary)', // Replaced hardcoded gray
           fontSize: '12px', 
           letterSpacing: '2px', 
           textTransform: 'uppercase',
@@ -21,29 +33,29 @@ const RiderView = () => {
         </div>
       </div>
 
-      {/* 2. BOOKING PANEL - Pinned to the Left Side */}
+      {/* 3. BOOKING PANEL */}
       <div className="panel-card" style={panelStyle}>
         <div style={{ marginBottom: '28px' }}>
-          <h2 className="text-main" style={{ fontSize: '24px', fontWeight: '900', margin: '0 0 4px 0', letterSpacing: '-0.5px' }}>
+          <h2 style={{ color: 'var(--text-main)', fontSize: '24px', fontWeight: '900', margin: '0 0 4px 0', letterSpacing: '-0.5px' }}>
             Where to?
           </h2>
-          <p className="text-secondary" style={{ fontSize: '14px', fontWeight: '500', margin: 0 }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500', margin: 0 }}>
             Enter your destination for CampusRide
           </p>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative' }}>
           
-          {/* Pickup Input - .text-main ensures bright white text in dark mode */}
+          {/* Pickup Input */}
           <div className="bg-loc-start" style={inputWrapperStyle}>
             <div className="loc-start" style={iconStyle}>
               <Circle size={10} fill="currentColor" strokeWidth={3} />
             </div>
             <input 
-              placeholder="Current Location" 
+              placeholder="Pick up Location" 
               value={pickup} 
               onChange={(e) => setPickup(e.target.value)} 
-              className="text-main"
+              className="rider-search-input" // Applies our protected styles
               style={inputStyle} 
             />
           </div>
@@ -57,16 +69,16 @@ const RiderView = () => {
               placeholder="Enter Destination" 
               value={destination} 
               onChange={(e) => setDestination(e.target.value)} 
-              className="text-main"
+              className="rider-search-input" // Applies our protected styles
               style={inputStyle} 
             />
           </div>
 
-          {/* Decorative connector dashed line - Style handled by .loc-line class */}
+          {/* Decorative connector dashed line */}
           <div className="loc-line" style={connectorLineStyle} />
         </div>
 
-        {/* This button stays Blue in both modes via .search-btn in CSS */}
+        {/* Search Button */}
         <button className="search-btn" style={confirmBtnStyle}>
           <Search size={18} style={{ marginRight: '8px' }} />
           Search Rides
@@ -84,11 +96,11 @@ const mapPlaceholderStyle: React.CSSProperties = {
   left: 0, 
   width: '100%', 
   height: '100%', 
-  backgroundColor: '#e2e8f0', 
+  backgroundColor: 'var(--border-subtle)', // FIX: Removed hardcoded '#e2e8f0'
   display: 'flex', 
   justifyContent: 'center', 
   alignItems: 'center',
-  transition: 'background-color 0.4s ease'
+  transition: 'background-color 0.3s ease'
 };
 
 const panelStyle: React.CSSProperties = {
@@ -109,7 +121,7 @@ const inputWrapperStyle: React.CSSProperties = {
   padding: '16px', 
   borderRadius: '16px', 
   transition: 'all 0.2s ease',
-  border: '1.5px solid transparent' // Allows the CSS border-color to show
+  border: '1.5px solid transparent'
 };
 
 const iconStyle: React.CSSProperties = {
@@ -127,8 +139,6 @@ const connectorLineStyle: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = { 
-  border: 'none', 
-  background: 'transparent', 
   outline: 'none', 
   width: '100%', 
   fontSize: '16px', 

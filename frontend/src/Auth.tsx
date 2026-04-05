@@ -72,7 +72,7 @@ export default function Auth() {
           setMessage('Error: ' + error.message);
         } else {
           // This specific string triggers the GREEN color
-          setMessage('Account created! Check your email to verify.');
+          setMessage('Account created successfully!');
           setTimeout(() => toggleAuthMode(), 3000);
         }
       }
@@ -106,7 +106,7 @@ export default function Auth() {
                 border: '1px solid #dbeafe'
               }}
             >
-              <Sparkles size={16} /> Welcome Reward Active!
+              <Sparkles size={16} /> Referral activated!
             </motion.div>
           )}
         </AnimatePresence>

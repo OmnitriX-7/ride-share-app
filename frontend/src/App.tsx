@@ -7,6 +7,7 @@ import Auth from './Auth';
 import OnboardingSurvey from './OnboardingSurvey';
 import Home from './Home';
 import LoadingScreen from './LoadingScreen';
+import NotificationToast from './NotificationToast'; // Added the new component
 
 function App() {
   const { hasProfile, setHasProfile } = useUserStore();
@@ -89,6 +90,7 @@ function App() {
 
   return (
     <Router>
+      <NotificationToast /> {/* Added globally at the top level */}
       <AnimatePresence mode="wait">
         <Routes>
           <Route 
