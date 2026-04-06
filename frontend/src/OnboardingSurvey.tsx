@@ -7,16 +7,17 @@ import { useUserStore } from './store';
 import { supabase } from './supabaseClient';
 
 export default function OnboardingSurvey() {
-  const { setHasProfile, showToast } = useUserStore();
+  const navigate = useNavigate();
+  const { setProfile, setHasProfile } = useUserStore();
 
   const [step, setStep] = useState(1);
   const [fullname, setFullname] = useState('');
   const [phoneNo, setPhoneNo] = useState<string | undefined>('');
-  const [role, setRole] = useState('');
+  const [role, setRole] = useState<'rider' | 'driver' | ''>('');
   const [statusMessage, setStatusMessage] = useState('');
   const [error, setError] = useState('');
 
-  // 1. EARLY RETURN: This keeps the loading screen centered in the viewport
+  // Handle the loading state during submission
   if (statusMessage === 'loading') {
     return <LoadingScreen />;
   }
@@ -68,9 +69,16 @@ export default function OnboardingSurvey() {
   };
 
   const handleSubmit = async () => {
+    if (!role) return;
+    
     try {
       setStatusMessage('loading');
-      const { data: wasReferred, error: rpcError } = await supabase.rpc('complete_onboarding', {
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user session found");
+
+      // Call the SQL Function (RPC)
+      const { data, error: rpcError } = await supabase.rpc('complete_onboarding', {
         user_full_name: fullname.trim(),
         user_phone: phoneNo,
         user_role: role
@@ -82,14 +90,20 @@ export default function OnboardingSurvey() {
         return;
       }
 
+      // Small delay for UX/Animation then sync store
       setTimeout(() => {
-        setHasProfile(true);
-        if (wasReferred) {
-          showToast("Welcome! Your 20% referral discount has been added.");
-        } else {
-          showToast("Profile setup complete! Welcome to CampusRide.");
-        }
-      }, 3200); 
+        setProfile({
+          id: user.id,
+          full_name: fullname.trim(),
+          role: role as 'rider' | 'driver',
+          onboarded: true
+        });
+        
+        // This triggers the App.tsx router to switch to /home
+        setHasProfile(true); 
+        navigate('/home', { replace: true });
+      }, 1200); 
+
     } catch (err) {
       console.error('Submission error:', err);
       setStatusMessage('Network error occurred.');
@@ -101,7 +115,7 @@ export default function OnboardingSurvey() {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: '100vh', // Changed to minHeight
+    minHeight: '100vh',
     width: '100%',
     backgroundColor: 'var(--bg-main)',
     padding: '20px',
@@ -109,6 +123,7 @@ export default function OnboardingSurvey() {
     boxSizing: 'border-box'
   };
 
+  // Error view if submission fails
   if (statusMessage && statusMessage !== 'loading') {
     return (
       <div style={wrapperStyle}>
@@ -138,6 +153,7 @@ export default function OnboardingSurvey() {
           </button>
         )}
 
+        {/* Progress Bar */}
         <div style={{ width: '100%', height: '6px', backgroundColor: '#f1f5f9', borderRadius: '10px', marginBottom: '32px', overflow: 'hidden', marginTop: step > 1 ? '10px' : '0' }}>
           <div style={{ width: `${(step / 3) * 100}%`, height: '100%', backgroundColor: '#2563eb', transition: 'width 0.5s cubic-bezier(0.16, 1, 0.3, 1)' }} />
         </div>
@@ -148,6 +164,7 @@ export default function OnboardingSurvey() {
           </p>
         )}
 
+        {/* STEP 1: Name */}
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div style={{ textAlign: 'center' }}>
@@ -167,6 +184,7 @@ export default function OnboardingSurvey() {
           </div>
         )}
 
+        {/* STEP 2: Phone */}
         {step === 2 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div style={{ textAlign: 'center' }}>
@@ -195,6 +213,7 @@ export default function OnboardingSurvey() {
           </div>
         )}
 
+        {/* STEP 3: Role Choice */}
         {step === 3 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div style={{ textAlign: 'center' }}>
@@ -211,7 +230,11 @@ export default function OnboardingSurvey() {
                 style={{ flex: 1, padding: '24px 16px', borderRadius: '16px', border: role === 'driver' ? '2.5px solid #2563eb' : '1.5px solid var(--border-subtle)', backgroundColor: role === 'driver' ? '#eff6ff' : 'var(--card-bg)', color: role === 'driver' ? '#2563eb' : 'var(--text-secondary)', fontWeight: '800', cursor: 'pointer' }}
               >Driver</button>
             </div>
-            <button onClick={handleSubmit} disabled={!role} style={{ width: '100%', padding: '16px', borderRadius: '14px', border: 'none', backgroundColor: role ? '#16a34a' : '#94a3b8', color: 'white', fontWeight: '800', cursor: role ? 'pointer' : 'not-allowed' }}>
+            <button 
+              onClick={handleSubmit} 
+              disabled={!role} 
+              style={{ width: '100%', padding: '16px', borderRadius: '14px', border: 'none', backgroundColor: role ? '#16a34a' : '#94a3b8', color: 'white', fontWeight: '800', cursor: role ? 'pointer' : 'not-allowed' }}
+            >
               Complete Setup
             </button>
           </div>

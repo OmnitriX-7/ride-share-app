@@ -11,7 +11,7 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const { showToast } = useUserStore();
 
-  // 1. Sync the view with the user's saved role
+  // 1. ROLE SYNC
   useEffect(() => {
     const syncRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -20,7 +20,7 @@ const Home = () => {
           .from('profiles')
           .select('role')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (data?.role === 'driver') {
           setIsDriverMode(true);
@@ -31,74 +31,58 @@ const Home = () => {
     syncRole();
   }, []);
 
-  // 2. UPDATED QUEUE SYSTEM: Mark as notified BEFORE showing toast to prevent repeats
+  // 2. REWARD NOTIFICATIONS (Fixed ordering)
   useEffect(() => {
-    const processNotificationQueue = async () => {
+    let rewardChannel: any;
+
+    const setupNotifications = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: pendingRewards } = await supabase
-        .from('coupons')
-        .select('id, code, discount_percent')
-        .eq('user_id', user.id)
-        .eq('is_referral_reward', true)
-        .eq('notified', false)
-        .order('created_at', { ascending: true });
+      // Initialize the channel
+      rewardChannel = supabase.channel(`new-reward-${user.id}`);
 
-      if (pendingRewards && pendingRewards.length > 0) {
-        const rewardIds = pendingRewards.map(r => r.id);
+      // STEP A: Attach the listener FIRST
+      rewardChannel.on(
+        'postgres_changes',
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'coupons',
+          filter: `user_id=eq.${user.id}` 
+        },
+        async (payload: any) => {
+          if (payload.new.is_referral_reward && !payload.new.notified) {
+            try {
+              // Update notified status so we don't show it again
+              await supabase
+                .from('coupons')
+                .update({ notified: true })
+                .eq('id', payload.new.id);
+              
+              showToast(`Referral Success! ${payload.new.discount_percent}% discount added.`);
+            } catch (err) {
+              console.error("Failed to update notification status", err);
+            }
+          }
+        }
+      );
 
-        // FIX: Mark ALL as notified in DB IMMEDIATELY
-        // This ensures if they refresh during the toasts, they don't see them again.
-        await supabase
-          .from('coupons')
-          .update({ notified: true })
-          .in('id', rewardIds);
-
-        // Now show them one by one for the UI experience
-        pendingRewards.forEach((reward, i) => {
-          setTimeout(() => {
-            showToast(`🎁 Reward: ${reward.discount_percent}% Discount Added! (Code: ${reward.code})`);
-          }, i * 4000); 
-        });
-      }
+      // STEP B: Call subscribe LAST
+      rewardChannel.subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Realtime: Successfully listening for rewards');
+        }
+      });
     };
 
-    processNotificationQueue();
+    setupNotifications();
 
-    // Real-time listener for new rewards while user is online
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (session?.user) {
-            const rewardChannel = supabase
-              .channel('new-reward-notif')
-              .on(
-                'postgres_changes',
-                { 
-                  event: 'INSERT', 
-                  schema: 'public', 
-                  table: 'coupons',
-                  filter: `user_id=eq.${session.user.id}` // Safety filter
-                },
-                async (payload) => {
-                  if (payload.new.is_referral_reward && !payload.new.notified) {
-                    // Mark as notified immediately
-                    await supabase
-                      .from('coupons')
-                      .update({ notified: true })
-                      .eq('id', payload.new.id);
-                      
-                    showToast(`New Referral! ${payload.new.discount_percent}% discount added.`);
-                  }
-                }
-              )
-              .subscribe();
-
-            return () => {
-              supabase.removeChannel(rewardChannel);
-            };
-        }
-    });
-
+    return () => {
+      if (rewardChannel) {
+        supabase.removeChannel(rewardChannel);
+      }
+    };
   }, [showToast]);
 
   if (loading) return null;
@@ -110,11 +94,11 @@ const Home = () => {
         position: 'relative', 
         minHeight: '100vh', 
         width: '100%', 
-        // FIX: Force the background to use the theme variable
         backgroundColor: 'var(--bg-main)',
         color: 'var(--text-main)',
         fontFamily: '"Inter", sans-serif',
-        transition: 'background-color 0.3s ease'
+        transition: 'background-color 0.3s ease',
+        overflowX: 'hidden'
       }}
     >
       <div style={{ position: 'sticky', top: 0, zIndex: 1000 }}>
@@ -152,7 +136,6 @@ const Home = () => {
         </AnimatePresence>
       </main>
 
-      {/* Decorative gradient overlay */}
       <div style={{
         position: 'fixed',
         bottom: 0,

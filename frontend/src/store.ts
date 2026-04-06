@@ -1,34 +1,51 @@
 import { create } from 'zustand';
 
+// Made properties optional so the store can hold a "partial" profile 
+// during the signup/onboarding transition.
+interface UserProfile {
+  id: string;
+  full_name?: string;
+  role?: 'rider' | 'driver';
+  onboarded?: boolean;
+  phone_number?: string; // Added this to match your SQL schema
+}
+
 interface UserState {
-  hasProfile: boolean | null;
-  setHasProfile: (status: boolean | null) => void;
+  profile: UserProfile | null;
+  setProfile: (profile: UserProfile | null) => void;
   
-  // --- NEW: NOTIFICATION STATE ---
+  // hasProfile is used for the "Flicker Fix" in App.tsx
+  hasProfile: boolean | null; 
+  setHasProfile: (status: boolean | null) => void;
+
   notification: { 
     message: string; 
     visible: boolean; 
   };
   
-  // Call this function from any component to trigger the pop-up
   showToast: (msg: string) => void;
 }
 
 export const useUserStore = create<UserState>((set) => ({
+  profile: null,
+  setProfile: (profile) => set({ 
+    profile, 
+    // Automatically sync hasProfile based on the onboarded status
+    hasProfile: profile?.onboarded ?? false 
+  }),
+
   hasProfile: null,
   setHasProfile: (status) => set({ hasProfile: status }),
 
-  // Initial state: empty and hidden
   notification: { 
     message: '', 
     visible: false 
   },
 
   showToast: (msg) => {
-    // 1. Set the message and make it visible
+    // Basic debounce to prevent toast overlapping
     set({ notification: { message: msg, visible: true } });
-
-    // 2. Automatically hide after 3 seconds (3000ms)
+    
     setTimeout(() => {
       set({ notification: { message: '', visible: false } });
     }, 3000);

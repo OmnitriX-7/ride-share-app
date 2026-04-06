@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from './supabaseClient'; 
@@ -7,144 +7,142 @@ import Auth from './Auth';
 import OnboardingSurvey from './OnboardingSurvey';
 import Home from './Home';
 import LoadingScreen from './LoadingScreen';
-import NotificationToast from './NotificationToast'; // Added the new component
+import NotificationToast from './NotificationToast';
 
 function App() {
-  const { hasProfile, setHasProfile } = useUserStore();
+  const { setProfile, hasProfile, setHasProfile } = useUserStore();
   const [session, setSession] = useState<any>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-  // Helper: Checks if the profile has a valid role assigned
-  const checkProfileStatus = async (userId: string) => {
+  // Helper: Fetches profile and updates global store
+  const fetchAndSyncProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('role')
+        .select('*')
         .eq('id', userId)
         .maybeSingle(); 
       
       if (error) throw error;
-      // Profile is complete ONLY if role is 'rider' or 'driver'
-      return !!(data && (data.role === 'rider' || data.role === 'driver'));
+
+      if (data && data.onboarded) {
+        setProfile(data);
+        setHasProfile(true);
+        return true;
+      }
+      
+      setHasProfile(false);
+      return false;
     } catch (err) {
-      console.error("Auth Check Error:", err);
+      setHasProfile(false);
       return false;
     }
   };
 
   useEffect(() => {
     const initApp = async () => {
+      const startTime = Date.now();
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
-        setSession(initialSession);
         
         if (initialSession) {
-          const isComplete = await checkProfileStatus(initialSession.user.id);
-          setHasProfile(isComplete); 
+          // 1. Get the profile data first
+          await fetchAndSyncProfile(initialSession.user.id);
+          
+          // 2. Calculate animation timing (Minimum 2 seconds for the car)
+          const elapsedTime = Date.now() - startTime;
+          const minWait = 2000; 
+          
+          setTimeout(() => {
+            // 3. Reveal the app ONLY after the car finishes its journey
+            setSession(initialSession);
+            setIsInitialLoading(false);
+          }, Math.max(0, minWait - elapsedTime));
         } else {
           setHasProfile(false);
-        }
-      } finally {
-        // Wait 3.2s to let the 3s car animation finish fully
-        setTimeout(() => {
+          setSession(null);
           setIsInitialLoading(false);
-        }, 3200); 
+        }
+      } catch (error) {
+        console.error("Init Error:", error);
+        setIsInitialLoading(false);
       }
     };
 
     initApp();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      if (event === 'SIGNED_IN') {
-        // 1. Immediately "close the curtain"
-        setHasProfile(null);
-        setSession(currentSession);
+      if (event === 'SIGNED_IN' && currentSession) {
+        // Bring back the car for the login transition
+        setIsInitialLoading(true);
+        
+        const startTime = Date.now();
+        await fetchAndSyncProfile(currentSession.user.id);
+        
+        const elapsedTime = Date.now() - startTime;
+        const loginWait = 1800; 
 
-        if (currentSession) {
-          // 2. Check status while the car is driving
-          const isComplete = await checkProfileStatus(currentSession.user.id);
-          
-          // 3. Lift curtain only after the 3s animation finishes
-          setTimeout(() => {
-            setHasProfile(isComplete);
-          }, 3000);
-        }
+        setTimeout(() => {
+          // Sync state and hide loading simultaneously
+          setSession(currentSession);
+          setIsInitialLoading(false);
+        }, Math.max(0, loginWait - elapsedTime));
       } 
       else if (event === 'SIGNED_OUT') {
-        setSession(null);
+        setProfile(null);
         setHasProfile(false);
-      }
-      else {
-        setSession(currentSession);
+        setSession(null);
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [setHasProfile]);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
-  // --- FLASH PROTECTOR ---
-  // Blocks the Router from rendering until we know EXACTLY where to send the user
+  // Guard: Stay on the car animation while loading or while session/profile sync is pending
   if (isInitialLoading || (session && hasProfile === null)) {
     return <LoadingScreen />;
   }
 
   return (
     <Router>
-      <NotificationToast /> {/* Added globally at the top level */}
+      <NotificationToast />
       <AnimatePresence mode="wait">
         <Routes>
-          <Route 
-            path="/" 
-            element={
-              !session ? <Auth /> : (hasProfile === true ? <Navigate to="/home" replace /> : <Navigate to="/onboarding" replace />)
-            } 
-          />
+          {/* Landing / Login Logic */}
+          <Route path="/" element={
+            !session ? <Auth /> : 
+            (hasProfile === true ? <Navigate to="/home" replace /> : <Navigate to="/onboarding" replace />)
+          } />
 
-          <Route 
-            path="/auth" 
-            element={
-              !session ? <Auth /> : (hasProfile === true ? <Navigate to="/home" replace /> : <Navigate to="/onboarding" replace />)
-            } 
-          />
+          {/* Onboarding Logic */}
+          <Route path="/onboarding" element={
+            session && hasProfile === false ? <OnboardingSurvey /> : 
+            (hasProfile === true ? <Navigate to="/home" replace /> : <Navigate to="/" replace />)
+          } />
 
-          <Route 
-            path="/onboarding" 
-            element={
-              session && hasProfile === false ? (
-                <OnboardingSurvey />
-              ) : (
-                <Navigate to={hasProfile === true ? "/home" : "/"} replace />
-              )
-            } 
-          />
+          {/* Protected Home Logic */}
+          <Route path="/home" element={
+            session && hasProfile === true ? (
+              <motion.div 
+                key="home-content" 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                transition={{ duration: 0.5 }}
+                style={{ width: '100%' }}
+              >
+                <Home />
+              </motion.div>
+            ) : (
+              <Navigate to={session ? "/onboarding" : "/"} replace />
+            )
+          } />
 
-          <Route 
-            path="/home" 
-            element={
-              session && hasProfile === true ? (
-                <motion.div 
-                  key="home-content"
-                  initial={{ opacity: 0 }} 
-                  animate={{ opacity: 1 }} 
-                  transition={{ duration: 0.8, ease: "easeOut" }}
-                >
-                  <Home />
-                </motion.div>
-              ) : (
-                <Navigate to={session ? "/onboarding" : "/"} replace />
-              )
-            } 
-          />
-
-          <Route 
-            path="*" 
-            element={
-              <Navigate 
-                to={!session ? "/" : (hasProfile === true ? "/home" : "/onboarding")} 
-                replace 
-              />
-            } 
-          />
+          {/* Global Catch-all Redirect */}
+          <Route path="*" element={
+            <Navigate to={!session ? "/" : (hasProfile === true ? "/home" : "/onboarding")} replace />
+          } />
         </Routes>
       </AnimatePresence>
     </Router>
