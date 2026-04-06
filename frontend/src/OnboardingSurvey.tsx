@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css'; 
@@ -14,10 +14,33 @@ export default function OnboardingSurvey() {
   const [fullname, setFullname] = useState('');
   const [phoneNo, setPhoneNo] = useState<string | undefined>('');
   const [role, setRole] = useState<'rider' | 'driver' | ''>('');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [plateNumber, setPlateNumber] = useState('');
+  
+  const [isResuming, setIsResuming] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [error, setError] = useState('');
 
-  // Handle the loading state during submission
+  useEffect(() => {
+    const checkResumeState = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('role, onboarded')
+          .eq('id', user.id)
+          .single();
+
+        if (data && data.role === 'driver' && data.onboarded === false) {
+          setRole('driver');
+          setIsResuming(true);
+          setStep(4);
+        }
+      }
+    };
+    checkResumeState();
+  }, []);
+
   if (statusMessage === 'loading') {
     return <LoadingScreen />;
   }
@@ -62,13 +85,13 @@ export default function OnboardingSurvey() {
   };
 
   const handleBack = () => {
-    if (step > 1) {
+    if (step > 1 && !(step === 4 && isResuming)) {
       setError("");
       setStep(step - 1);
     }
   };
 
-  const handleSubmit = async () => {
+  const handleBasicSubmit = async () => {
     if (!role) return;
     
     try {
@@ -77,35 +100,71 @@ export default function OnboardingSurvey() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user session found");
 
-      // Call the SQL Function (RPC)
-      const { data, error: rpcError } = await supabase.rpc('complete_onboarding', {
+      const { error: rpcError } = await supabase.rpc('save_basic_profile', {
         user_full_name: fullname.trim(),
         user_phone: phoneNo,
         user_role: role
       });
 
       if (rpcError) {
-        console.error("Onboarding Error:", rpcError.message);
         setStatusMessage('Error saving profile. Please try again.');
         return;
       }
 
-      // Small delay for UX/Animation then sync store
+      if (role === 'rider') {
+        setTimeout(() => {
+          setProfile({
+            id: user.id,
+            full_name: fullname.trim(),
+            role: 'rider',
+            onboarded: true
+          });
+          setHasProfile(true); 
+          navigate('/home', { replace: true });
+        }, 1200); 
+      } else {
+        setStatusMessage('');
+        setStep(4);
+      }
+
+    } catch (err) {
+      setStatusMessage('Network error occurred.');
+    }
+  };
+
+  const handleDriverSubmit = async () => {
+    if (!vehicleModel.trim() || !plateNumber.trim()) {
+      setError("Please fill in both vehicle details.");
+      return;
+    }
+
+    try {
+      setStatusMessage('loading');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user session found");
+
+      const { error: rpcError } = await supabase.rpc('complete_driver_profile', {
+        v_model: vehicleModel.trim(),
+        v_plate: plateNumber.trim().toUpperCase()
+      });
+
+      if (rpcError) {
+        setStatusMessage('Error saving vehicle details.');
+        return;
+      }
+
       setTimeout(() => {
         setProfile({
           id: user.id,
-          full_name: fullname.trim(),
-          role: role as 'rider' | 'driver',
+          role: 'driver',
           onboarded: true
         });
-        
-        // This triggers the App.tsx router to switch to /home
         setHasProfile(true); 
         navigate('/home', { replace: true });
-      }, 1200); 
+      }, 1200);
 
     } catch (err) {
-      console.error('Submission error:', err);
       setStatusMessage('Network error occurred.');
     }
   };
@@ -123,7 +182,8 @@ export default function OnboardingSurvey() {
     boxSizing: 'border-box'
   };
 
-  // Error view if submission fails
+  const totalSteps = role === 'driver' || step === 4 ? 4 : 3;
+
   if (statusMessage && statusMessage !== 'loading') {
     return (
       <div style={wrapperStyle}>
@@ -144,7 +204,7 @@ export default function OnboardingSurvey() {
     <div style={wrapperStyle}>
       <div style={{ backgroundColor: 'var(--card-bg)', padding: '40px', borderRadius: '28px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.04)', width: '100%', maxWidth: '400px', border: '1px solid var(--border-subtle)', position: 'relative' }}>
         
-        {step > 1 && (
+        {step > 1 && !(step === 4 && isResuming) && (
           <button 
             onClick={handleBack}
             style={{ position: 'absolute', top: '20px', left: '20px', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
@@ -153,9 +213,8 @@ export default function OnboardingSurvey() {
           </button>
         )}
 
-        {/* Progress Bar */}
         <div style={{ width: '100%', height: '6px', backgroundColor: '#f1f5f9', borderRadius: '10px', marginBottom: '32px', overflow: 'hidden', marginTop: step > 1 ? '10px' : '0' }}>
-          <div style={{ width: `${(step / 3) * 100}%`, height: '100%', backgroundColor: '#2563eb', transition: 'width 0.5s cubic-bezier(0.16, 1, 0.3, 1)' }} />
+          <div style={{ width: `${(step / totalSteps) * 100}%`, height: '100%', backgroundColor: '#2563eb', transition: 'width 0.5s cubic-bezier(0.16, 1, 0.3, 1)' }} />
         </div>
 
         {error && (
@@ -164,7 +223,6 @@ export default function OnboardingSurvey() {
           </p>
         )}
 
-        {/* STEP 1: Name */}
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div style={{ textAlign: 'center' }}>
@@ -184,7 +242,6 @@ export default function OnboardingSurvey() {
           </div>
         )}
 
-        {/* STEP 2: Phone */}
         {step === 2 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div style={{ textAlign: 'center' }}>
@@ -213,7 +270,6 @@ export default function OnboardingSurvey() {
           </div>
         )}
 
-        {/* STEP 3: Role Choice */}
         {step === 3 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div style={{ textAlign: 'center' }}>
@@ -231,14 +287,41 @@ export default function OnboardingSurvey() {
               >Driver</button>
             </div>
             <button 
-              onClick={handleSubmit} 
+              onClick={handleBasicSubmit} 
               disabled={!role} 
               style={{ width: '100%', padding: '16px', borderRadius: '14px', border: 'none', backgroundColor: role ? '#16a34a' : '#94a3b8', color: 'white', fontWeight: '800', cursor: role ? 'pointer' : 'not-allowed' }}
             >
-              Complete Setup
+              {role === 'driver' ? 'Next: Vehicle Details' : 'Complete Setup'}
             </button>
           </div>
         )}
+
+        {step === 4 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <h2 style={{ color: 'var(--text-main)', fontSize: '24px', fontWeight: '800', marginBottom: '8px' }}>Vehicle Details</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Just a few more details</p>
+            </div>
+            <input
+              type="text"
+              value={vehicleModel}
+              onChange={(e) => { setVehicleModel(e.target.value); setError(''); }}
+              placeholder="Vehicle Model (e.g., Maruti Alto)"
+              style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1.5px solid var(--border-subtle)', fontSize: '15px', outline: 'none', backgroundColor: 'var(--input-bg)', boxSizing: 'border-box', color: 'var(--text-main)' }}
+            />
+            <input
+              type="text"
+              value={plateNumber}
+              onChange={(e) => { setPlateNumber(e.target.value.toUpperCase()); setError(''); }}
+              placeholder="License Plate (e.g., AS-11-AA-1234)"
+              style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1.5px solid var(--border-subtle)', fontSize: '15px', outline: 'none', backgroundColor: 'var(--input-bg)', boxSizing: 'border-box', color: 'var(--text-main)', textTransform: 'uppercase' }}
+            />
+            <button onClick={handleDriverSubmit} style={{ width: '100%', padding: '16px', borderRadius: '14px', border: 'none', backgroundColor: '#16a34a', color: 'white', fontWeight: '800', cursor: 'pointer' }}>
+              Complete Driver Setup
+            </button>
+          </div>
+        )}
+
       </div>
 
       <style>{`
