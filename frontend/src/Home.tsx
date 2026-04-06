@@ -7,83 +7,52 @@ import RiderView from './RiderView';
 import DriverView from './DriverView';
 
 const Home = () => {
-  const [isDriverMode, setIsDriverMode] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const { showToast } = useUserStore();
+  const { profile, showToast } = useUserStore();
+  const [isDriverMode, setIsDriverMode] = useState(profile?.role === 'driver');
+  const [loading, setLoading] = useState(!profile);
 
-  // 1. ROLE SYNC
   useEffect(() => {
-    const syncRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (data?.role === 'driver') {
-          setIsDriverMode(true);
-        }
-      }
+    if (profile) {
+      setIsDriverMode(profile.role === 'driver');
       setLoading(false);
-    };
-    syncRole();
-  }, []);
+    }
+  }, [profile]);
 
-  // 2. REWARD NOTIFICATIONS (Fixed ordering)
   useEffect(() => {
-    let rewardChannel: any;
+    if (!profile?.id) return;
 
-    const setupNotifications = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    const rewardChannel = supabase.channel(`new-reward-${profile.id}`);
 
-      // Initialize the channel
-      rewardChannel = supabase.channel(`new-reward-${user.id}`);
-
-      // STEP A: Attach the listener FIRST
-      rewardChannel.on(
-        'postgres_changes',
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'coupons',
-          filter: `user_id=eq.${user.id}` 
-        },
-        async (payload: any) => {
-          if (payload.new.is_referral_reward && !payload.new.notified) {
-            try {
-              // Update notified status so we don't show it again
-              await supabase
-                .from('coupons')
-                .update({ notified: true })
-                .eq('id', payload.new.id);
-              
-              showToast(`Referral Success! ${payload.new.discount_percent}% discount added.`);
-            } catch (err) {
-              console.error("Failed to update notification status", err);
-            }
+    rewardChannel.on(
+      'postgres_changes',
+      { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'coupons',
+        filter: `user_id=eq.${profile.id}` 
+      },
+      async (payload: any) => {
+        if (payload.new.is_referral_reward && !payload.new.notified) {
+          try {
+            await supabase
+              .from('coupons')
+              .update({ notified: true })
+              .eq('id', payload.new.id);
+            
+            showToast(`Referral Success! ${payload.new.discount_percent}% discount added.`);
+          } catch (err) {
+            console.error(err);
           }
         }
-      );
+      }
+    );
 
-      // STEP B: Call subscribe LAST
-      rewardChannel.subscribe((status: string) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Realtime: Successfully listening for rewards');
-        }
-      });
-    };
-
-    setupNotifications();
+    rewardChannel.subscribe();
 
     return () => {
-      if (rewardChannel) {
-        supabase.removeChannel(rewardChannel);
-      }
+      supabase.removeChannel(rewardChannel);
     };
-  }, [showToast]);
+  }, [profile?.id, showToast]);
 
   if (loading) return null;
 

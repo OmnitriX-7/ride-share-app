@@ -1,10 +1,13 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Gift, Sparkles } from 'lucide-react';
+import { Gift, Sparkles, Bell, Info } from 'lucide-react';
 import { useUserStore } from './store';
 
 const Notification = () => {
   const { notification } = useUserStore();
+
+  // Logic to determine if this is a referral-related notification
+  const isReferral = notification.message?.toLowerCase().includes('referral');
 
   return (
     <AnimatePresence>
@@ -31,18 +34,37 @@ const Notification = () => {
             minWidth: '320px'
           }}
         >
-          <div style={{ backgroundColor: '#2563eb', padding: '8px', borderRadius: '12px' }}>
-            <Gift size={18} color="white" />
+          {/* Dynamic Icon Container */}
+          <div style={{ 
+            backgroundColor: isReferral ? '#2563eb' : '#334155', 
+            padding: '8px', 
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            {isReferral ? (
+              <Gift size={18} color="white" />
+            ) : (
+              <Bell size={18} color="white" />
+            )}
           </div>
+
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontSize: '13px', fontWeight: '800', letterSpacing: '0.3px' }}>
-              Reward Unlocked!
+              {isReferral ? 'Reward Unlocked!' : 'System Update'}
             </span>
             <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '500' }}>
               {notification.message}
             </span>
           </div>
-          <Sparkles size={16} color="#fbbf24" style={{ marginLeft: 'auto' }} />
+
+          {/* Dynamic Accessory Icon */}
+          {isReferral ? (
+            <Sparkles size={16} color="#fbbf24" style={{ marginLeft: 'auto' }} />
+          ) : (
+            <Info size={16} color="#64748b" style={{ marginLeft: 'auto' }} />
+          )}
         </motion.div>
       )}
     </AnimatePresence>

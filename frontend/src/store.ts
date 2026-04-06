@@ -1,20 +1,19 @@
 import { create } from 'zustand';
 
-// Made properties optional so the store can hold a "partial" profile 
-// during the signup/onboarding transition.
 interface UserProfile {
   id: string;
   full_name?: string;
   role?: 'rider' | 'driver';
   onboarded?: boolean;
-  phone_number?: string; // Added this to match your SQL schema
+  phone_number?: string;
 }
 
 interface UserState {
   profile: UserProfile | null;
-  setProfile: (profile: UserProfile | null) => void;
+  // Merges new data into the existing profile to prevent data loss
+  setProfile: (updates: Partial<UserProfile> | null) => void;
   
-  // hasProfile is used for the "Flicker Fix" in App.tsx
+  // hasProfile: null (loading), false (not onboarded), true (ready)
   hasProfile: boolean | null; 
   setHasProfile: (status: boolean | null) => void;
 
@@ -28,10 +27,22 @@ interface UserState {
 
 export const useUserStore = create<UserState>((set) => ({
   profile: null,
-  setProfile: (profile) => set({ 
-    profile, 
-    // Automatically sync hasProfile based on the onboarded status
-    hasProfile: profile?.onboarded ?? false 
+  
+  setProfile: (updates) => set((state) => {
+    if (updates === null) {
+      return { profile: null, hasProfile: false };
+    }
+
+    // Merge existing profile with new updates
+    const updatedProfile = state.profile 
+      ? { ...state.profile, ...updates } 
+      : (updates as UserProfile);
+
+    return { 
+      profile: updatedProfile,
+      // If the update contains 'onboarded', sync hasProfile immediately
+      hasProfile: updatedProfile.onboarded ?? false
+    };
   }),
 
   hasProfile: null,
@@ -43,11 +54,18 @@ export const useUserStore = create<UserState>((set) => ({
   },
 
   showToast: (msg) => {
-    // Basic debounce to prevent toast overlapping
+    // Immediate reset if a toast is already visible to "restart" the animation
     set({ notification: { message: msg, visible: true } });
     
+    // Clear after 3 seconds
     setTimeout(() => {
-      set({ notification: { message: '', visible: false } });
+      set((state) => {
+        // Only clear if the message hasn't changed (prevents race conditions)
+        if (state.notification.message === msg) {
+          return { notification: { message: '', visible: false } };
+        }
+        return state;
+      });
     }, 3000);
   },
 }));

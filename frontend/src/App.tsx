@@ -14,7 +14,6 @@ function App() {
   const [session, setSession] = useState<any>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-  // Helper: Fetches profile and updates global store
   const fetchAndSyncProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -25,15 +24,18 @@ function App() {
       
       if (error) throw error;
 
-      if (data && data.onboarded) {
+      if (data) {
+        // CRITICAL: Always set the profile in the store so Onboarding 
+        // knows the user's role even if they aren't fully onboarded yet.
         setProfile(data);
-        setHasProfile(true);
-        return true;
+        setHasProfile(data.onboarded); 
+        return data.onboarded;
       }
       
       setHasProfile(false);
       return false;
     } catch (err) {
+      console.error("Profile sync error:", err);
       setHasProfile(false);
       return false;
     }
@@ -46,15 +48,12 @@ function App() {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         
         if (initialSession) {
-          // 1. Get the profile data first
           await fetchAndSyncProfile(initialSession.user.id);
           
-          // 2. Calculate animation timing (Minimum 2 seconds for the car)
           const elapsedTime = Date.now() - startTime;
           const minWait = 2000; 
           
           setTimeout(() => {
-            // 3. Reveal the app ONLY after the car finishes its journey
             setSession(initialSession);
             setIsInitialLoading(false);
           }, Math.max(0, minWait - elapsedTime));
@@ -72,8 +71,7 @@ function App() {
     initApp();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      if (event === 'SIGNED_IN' && currentSession) {
-        // Bring back the car for the login transition
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && currentSession) {
         setIsInitialLoading(true);
         
         const startTime = Date.now();
@@ -83,7 +81,6 @@ function App() {
         const loginWait = 1800; 
 
         setTimeout(() => {
-          // Sync state and hide loading simultaneously
           setSession(currentSession);
           setIsInitialLoading(false);
         }, Math.max(0, loginWait - elapsedTime));
@@ -98,10 +95,9 @@ function App() {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [setProfile, setHasProfile]);
 
-  // Guard: Stay on the car animation while loading or while session/profile sync is pending
-  if (isInitialLoading || (session && hasProfile === null)) {
+  if (isInitialLoading) {
     return <LoadingScreen />;
   }
 
