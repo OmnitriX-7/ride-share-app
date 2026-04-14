@@ -8,13 +8,14 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient'; 
+import { useUserStore } from './store'; // Added store import
 
 const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
+  const { profile, setProfile } = useUserStore(); // Pulling profile from store
   const [isOpen, setIsOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const navigate = useNavigate();
 
-  // Sync internal state with document class on mount
   useEffect(() => {
     const isDark = document.documentElement.classList.contains('dark');
     setIsDarkMode(isDark);
@@ -23,10 +24,7 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
   const handleReferral = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        alert("Please log in to refer friends!");
-        return;
-      }
+      if (!user) return;
 
       const referralLink = `${window.location.origin}/auth?ref=${user.id}`;
       const shareData = {
@@ -39,7 +37,7 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(referralLink);
-        alert("Referral link copied to clipboard!");
+        alert("Referral link copied!");
       }
     } catch (err) {
       console.error('Error sharing:', err);
@@ -61,8 +59,9 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
   const handleLogout = async () => {
     if (window.confirm("Are you sure you want to log out?")) {
       await supabase.auth.signOut();
+      setProfile(null); // Clear store on logout
       localStorage.clear();
-      navigate('/login');
+      navigate('/', { replace: true });
     }
   };
 
@@ -96,12 +95,16 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
               >
                 <div 
                   style={menuHeaderStyle} 
-                  onClick={() => navigate('/profile')}
+                  onClick={() => { navigate('/profile'); setIsOpen(false); }}
                 >
                    <div style={largePfpStyle}><User size={24} color="#2563eb"/></div>
                    <div style={{ flex: 1 }}>
-                     <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-main)' }}>Bilir Goyari</div>
-                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Account Settings</div>
+                     <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-main)' }}>
+                       {profile?.full_name || 'User'} 
+                     </div>
+                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                       {profile?.role === 'driver' ? 'Verified Driver' : 'Campus Rider'}
+                     </div>
                    </div>
                    <ChevronRight size={16} color="#cbd5e1" />
                 </div>
@@ -110,13 +113,16 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
                   <MenuButton icon={<Trophy size={18}/>} label="Leaderboard" />
                   <MenuButton icon={<CreditCard size={18}/>} label="Payments" />
                   
+                  {/* The Role-Switch Button */}
                   <MenuButton 
                     icon={<RefreshCw size={18} color="#2563eb"/>} 
                     label={isDriverMode ? "Switch to Rider" : "Switch to Driver"} 
-                    onClick={() => { setIsDriverMode(!isDriverMode); setIsOpen(false); }}
+                    onClick={() => { 
+                      setIsDriverMode(!isDriverMode); 
+                      setIsOpen(false); 
+                    }}
                   />
 
-                  {/* Dark Mode Toggle */}
                   <div style={toggleItemStyle}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       {isDarkMode ? <Moon size={18} color="var(--text-main)"/> : <Sun size={18} color="var(--text-main)"/>}
@@ -127,7 +133,7 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
                     </button>
                   </div>
 
-                  <MenuButton icon={<Crown size={18} color="#eab308"/>} label="Buy Pro" />
+                  <MenuButton icon={<Crown size={18} color="#eab308"/>} label="CampusRide Gold" />
                   
                   <MenuButton 
                     icon={<Users size={18} color="#2563eb"/>} 
@@ -135,16 +141,17 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
                     onClick={handleReferral}
                   />
 
-                  <MenuButton icon={<Star size={18}/>} label="Rate the App" />
-                  <MenuButton icon={<AlertTriangle size={18}/>} label="Report an Issue" />
+                  <MenuButton icon={<Star size={18}/>} label="Rate App" />
                   <MenuButton icon={<ShieldAlert size={18} color="#ef4444"/>} label="SOS / Safety" />
                   
-                  <MenuButton 
-                    icon={<LogOut size={18} color="#ef4444" />} 
-                    label="Log Out" 
-                    isDestructive={true}
-                    onClick={handleLogout} 
-                  />
+                  <div style={{ borderTop: '1px solid var(--border-subtle)', marginTop: '8px', paddingTop: '8px' }}>
+                    <MenuButton 
+                      icon={<LogOut size={18} color="#ef4444" />} 
+                      label="Log Out" 
+                      isDestructive={true}
+                      onClick={handleLogout} 
+                    />
+                  </div>
                 </div>
               </motion.div>
             </>
@@ -155,7 +162,6 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
   );
 };
 
-/* --- SHARED COMPONENTS --- */
 const MenuButton = ({ icon, label, onClick, isDestructive }: any) => {
   return (
     <button 
@@ -173,9 +179,8 @@ const MenuButton = ({ icon, label, onClick, isDestructive }: any) => {
 };
 
 /* --- STYLES --- */
-// Using CSS Variables for automatic theme switching
 const headerStyle: React.CSSProperties = { 
-  position: 'absolute', top: 0, width: '100%', padding: '20px 40px', 
+  position: 'absolute', top: 0, width: '100%', padding: '20px 24px', 
   display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
   zIndex: 1000, boxSizing: 'border-box' 
 };
@@ -191,25 +196,26 @@ const logoIconStyle: React.CSSProperties = {
 const pfpButtonStyle: React.CSSProperties = { 
   width: '44px', height: '44px', borderRadius: '50%', 
   backgroundColor: '#0f172a', border: 'none', cursor: 'pointer', 
-  display: 'flex', justifyContent: 'center', alignItems: 'center' 
+  display: 'flex', justifyContent: 'center', alignItems: 'center',
+  boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
 };
 
 const menuCardStyle: React.CSSProperties = { 
   position: 'absolute', top: '55px', right: '0px', width: '260px', 
-  borderRadius: '20px', padding: '12px', zIndex: 1001,
+  borderRadius: '24px', padding: '12px', zIndex: 1001,
   backgroundColor: 'var(--card-bg)',
   border: '1px solid var(--border-subtle)',
-  boxShadow: '0 20px 40px rgba(0,0,0,0.12)'
+  boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
 };
 
 const menuHeaderStyle: React.CSSProperties = { 
   display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', 
-  cursor: 'pointer', borderRadius: '14px', marginBottom: '8px',
+  cursor: 'pointer', borderRadius: '16px', marginBottom: '8px',
   backgroundColor: 'var(--bg-main)'
 };
 
 const largePfpStyle: React.CSSProperties = { 
-  width: '40px', height: '40px', borderRadius: '10px', 
+  width: '40px', height: '40px', borderRadius: '12px', 
   backgroundColor: 'rgba(37, 99, 235, 0.1)', display: 'flex', 
   justifyContent: 'center', alignItems: 'center' 
 };
@@ -217,14 +223,14 @@ const largePfpStyle: React.CSSProperties = {
 const listStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '2px' };
 
 const menuBtnStyle: React.CSSProperties = { 
-  display: 'flex', alignItems: 'center', width: '100%', padding: '12px', 
-  border: 'none', background: 'transparent', borderRadius: '10px', 
+  display: 'flex', alignItems: 'center', width: '100%', padding: '10px 12px', 
+  border: 'none', background: 'transparent', borderRadius: '12px', 
   cursor: 'pointer', textAlign: 'left', fontSize: '14px', fontWeight: '500' 
 };
 
 const toggleItemStyle: React.CSSProperties = { 
   display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
-  padding: '12px', fontSize: '14px', fontWeight: '500' 
+  padding: '10px 12px', fontSize: '14px', fontWeight: '500' 
 };
 
 const toggleSwitchStyle = (isOn: boolean): React.CSSProperties => ({ 

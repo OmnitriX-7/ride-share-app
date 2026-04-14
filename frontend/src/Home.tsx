@@ -5,9 +5,11 @@ import { useUserStore } from './store';
 import Navbar from './Navbar';
 import RiderView from './RiderView';
 import DriverView from './DriverView';
+import LoadingScreen from './LoadingScreen';
 
 const Home = () => {
   const { profile, showToast } = useUserStore();
+  // Initialize mode based on database role
   const [isDriverMode, setIsDriverMode] = useState(profile?.role === 'driver');
   const [loading, setLoading] = useState(!profile);
 
@@ -18,43 +20,37 @@ const Home = () => {
     }
   }, [profile]);
 
+  // Handle manual toggle from Navbar
+  const handleToggleMode = (requestedMode: boolean) => {
+    if (requestedMode && profile?.role !== 'driver') {
+      showToast("You need to register as a driver to access this mode.");
+      return;
+    }
+    setIsDriverMode(requestedMode);
+  };
+
+  // Real-time listener for Rewards/Coupons
   useEffect(() => {
     if (!profile?.id) return;
 
-    const rewardChannel = supabase.channel(`new-reward-${profile.id}`);
-
-    rewardChannel.on(
-      'postgres_changes',
-      { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'coupons',
-        filter: `user_id=eq.${profile.id}` 
-      },
-      async (payload: any) => {
-        if (payload.new.is_referral_reward && !payload.new.notified) {
-          try {
-            await supabase
-              .from('coupons')
-              .update({ notified: true })
-              .eq('id', payload.new.id);
-            
-            showToast(`Referral Success! ${payload.new.discount_percent}% discount added.`);
-          } catch (err) {
-            console.error(err);
+    const rewardChannel = supabase.channel(`user-rewards-${profile.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'coupons', filter: `user_id=eq.${profile.id}` },
+        async (payload: any) => {
+          if (payload.new.is_referral_reward && !payload.new.notified) {
+            showToast(`Referral Unlocked! ${payload.new.discount_percent}% discount ready.`);
+            // Mark as notified in DB
+            await supabase.from('coupons').update({ notified: true }).eq('id', payload.new.id);
           }
         }
-      }
-    );
+      )
+      .subscribe();
 
-    rewardChannel.subscribe();
-
-    return () => {
-      supabase.removeChannel(rewardChannel);
-    };
+    return () => { supabase.removeChannel(rewardChannel); };
   }, [profile?.id, showToast]);
 
-  if (loading) return null;
+  if (loading) return <LoadingScreen />;
 
   return (
     <div 
@@ -65,7 +61,6 @@ const Home = () => {
         width: '100%', 
         backgroundColor: 'var(--bg-main)',
         color: 'var(--text-main)',
-        fontFamily: '"Inter", sans-serif',
         transition: 'background-color 0.3s ease',
         overflowX: 'hidden'
       }}
@@ -73,7 +68,7 @@ const Home = () => {
       <div style={{ position: 'sticky', top: 0, zIndex: 1000 }}>
         <Navbar 
           isDriverMode={isDriverMode} 
-          setIsDriverMode={setIsDriverMode} 
+          setIsDriverMode={handleToggleMode} 
         />
       </div>
 
@@ -82,22 +77,20 @@ const Home = () => {
           {isDriverMode ? (
             <motion.div
               key="driver"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
-              style={{ width: '100%' }}
             >
               <DriverView />
             </motion.div>
           ) : (
             <motion.div
               key="rider"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.3 }}
-              style={{ width: '100%' }}
             >
               <RiderView />
             </motion.div>
@@ -105,6 +98,7 @@ const Home = () => {
         </AnimatePresence>
       </main>
 
+      {/* Decorative background blur */}
       <div style={{
         position: 'fixed',
         bottom: 0,

@@ -1,3 +1,4 @@
+import 'leaflet/dist/leaflet.css'; // <-- ADDED THIS LINE FOR THE MAP TO WORK
 import './index.css';
 import React from 'react'
 import ReactDOM from 'react-dom/client'

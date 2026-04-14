@@ -27,19 +27,26 @@ export default function OnboardingSurvey() {
       if (user) {
         const { data } = await supabase
           .from('profiles')
-          .select('role, onboarded')
+          .select('full_name, phone_number, role, onboarded')
           .eq('id', user.id)
           .single();
 
-        if (data && data.role === 'driver' && data.onboarded === false) {
-          setRole('driver');
-          setIsResuming(true);
-          setStep(4);
+        if (data) {
+          if (data.full_name) setFullname(data.full_name);
+          if (data.phone_number) setPhoneNo(data.phone_number);
+          
+          if (data.role === 'driver' && data.onboarded === false) {
+            setRole('driver');
+            setIsResuming(true);
+            setStep(4);
+          } else if (data.onboarded === true) {
+            navigate('/home', { replace: true });
+          }
         }
       }
     };
     checkResumeState();
-  }, []);
+  }, [navigate]);
 
   if (statusMessage === 'loading') {
     return <LoadingScreen />;
@@ -96,7 +103,6 @@ export default function OnboardingSurvey() {
     
     try {
       setStatusMessage('loading');
-      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user session found");
 
@@ -106,29 +112,32 @@ export default function OnboardingSurvey() {
         user_role: role
       });
 
-      if (rpcError) {
-        setStatusMessage('Error saving profile. Please try again.');
-        return;
-      }
+      if (rpcError) throw rpcError;
 
       if (role === 'rider') {
-        setTimeout(() => {
-          setProfile({
-            id: user.id,
-            full_name: fullname.trim(),
-            role: 'rider',
-            onboarded: true
-          });
-          setHasProfile(true); 
-          navigate('/home', { replace: true });
-        }, 1200); 
+        const { error: updateErr } = await supabase
+          .from('profiles')
+          .update({ onboarded: true })
+          .eq('id', user.id);
+        
+        if (updateErr) throw updateErr;
+
+        setProfile({
+          id: user.id,
+          full_name: fullname.trim(),
+          role: 'rider',
+          onboarded: true
+        });
+        setHasProfile(true); 
+        navigate('/home', { replace: true });
       } else {
         setStatusMessage('');
         setStep(4);
       }
 
     } catch (err) {
-      setStatusMessage('Network error occurred.');
+      console.error(err);
+      setStatusMessage('Error saving profile. Try again.');
     }
   };
 
@@ -140,32 +149,40 @@ export default function OnboardingSurvey() {
 
     try {
       setStatusMessage('loading');
-      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user session found");
 
+      // 1. Save vehicle details
       const { error: rpcError } = await supabase.rpc('complete_driver_profile', {
         v_model: vehicleModel.trim(),
         v_plate: plateNumber.trim().toUpperCase()
       });
 
-      if (rpcError) {
-        setStatusMessage('Error saving vehicle details.');
-        return;
+      if (rpcError) throw rpcError;
+
+      // 2. Request initial location for the drivers table
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          await supabase.from('drivers').update({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            status: 'offline'
+          }).eq('id', user.id);
+        });
       }
 
-      setTimeout(() => {
-        setProfile({
-          id: user.id,
-          role: 'driver',
-          onboarded: true
-        });
-        setHasProfile(true); 
-        navigate('/home', { replace: true });
-      }, 1200);
+      setProfile({
+        id: user.id,
+        full_name: fullname.trim(),
+        role: 'driver',
+        onboarded: true
+      });
+      setHasProfile(true); 
+      navigate('/home', { replace: true });
 
     } catch (err) {
-      setStatusMessage('Network error occurred.');
+      console.error(err);
+      setStatusMessage('Error saving vehicle details.');
     }
   };
 
@@ -182,7 +199,7 @@ export default function OnboardingSurvey() {
     boxSizing: 'border-box'
   };
 
-  const totalSteps = role === 'driver' || step === 4 ? 4 : 3;
+  const totalSteps = 4;
 
   if (statusMessage && statusMessage !== 'loading') {
     return (

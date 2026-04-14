@@ -25,8 +25,6 @@ function App() {
       if (error) throw error;
 
       if (data) {
-        // CRITICAL: Always set the profile in the store so Onboarding 
-        // knows the user's role even if they aren't fully onboarded yet.
         setProfile(data);
         setHasProfile(data.onboarded); 
         return data.onboarded;
@@ -35,7 +33,6 @@ function App() {
       setHasProfile(false);
       return false;
     } catch (err) {
-      console.error("Profile sync error:", err);
       setHasProfile(false);
       return false;
     }
@@ -43,27 +40,19 @@ function App() {
 
   useEffect(() => {
     const initApp = async () => {
-      const startTime = Date.now();
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         
         if (initialSession) {
+          setSession(initialSession);
           await fetchAndSyncProfile(initialSession.user.id);
-          
-          const elapsedTime = Date.now() - startTime;
-          const minWait = 2000; 
-          
-          setTimeout(() => {
-            setSession(initialSession);
-            setIsInitialLoading(false);
-          }, Math.max(0, minWait - elapsedTime));
         } else {
           setHasProfile(false);
           setSession(null);
-          setIsInitialLoading(false);
         }
       } catch (error) {
-        console.error("Init Error:", error);
+        console.error(error);
+      } finally {
         setIsInitialLoading(false);
       }
     };
@@ -71,30 +60,22 @@ function App() {
     initApp();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && currentSession) {
+      if (event === 'SIGNED_IN' && currentSession) {
         setIsInitialLoading(true);
-        
-        const startTime = Date.now();
+        setSession(currentSession);
         await fetchAndSyncProfile(currentSession.user.id);
-        
-        const elapsedTime = Date.now() - startTime;
-        const loginWait = 1800; 
-
-        setTimeout(() => {
-          setSession(currentSession);
-          setIsInitialLoading(false);
-        }, Math.max(0, loginWait - elapsedTime));
-      } 
-      else if (event === 'SIGNED_OUT') {
+        setIsInitialLoading(false);
+      } else if (event === 'SIGNED_OUT') {
         setProfile(null);
         setHasProfile(false);
         setSession(null);
+        setIsInitialLoading(false);
+      } else if (currentSession) {
+        setSession(currentSession);
       }
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, [setProfile, setHasProfile]);
 
   if (isInitialLoading) {
@@ -106,26 +87,22 @@ function App() {
       <NotificationToast />
       <AnimatePresence mode="wait">
         <Routes>
-          {/* Landing / Login Logic */}
           <Route path="/" element={
             !session ? <Auth /> : 
-            (hasProfile === true ? <Navigate to="/home" replace /> : <Navigate to="/onboarding" replace />)
+            (hasProfile ? <Navigate to="/home" replace /> : <Navigate to="/onboarding" replace />)
           } />
 
-          {/* Onboarding Logic */}
           <Route path="/onboarding" element={
-            session && hasProfile === false ? <OnboardingSurvey /> : 
-            (hasProfile === true ? <Navigate to="/home" replace /> : <Navigate to="/" replace />)
+            session && !hasProfile ? <OnboardingSurvey /> : 
+            (hasProfile ? <Navigate to="/home" replace /> : <Navigate to="/" replace />)
           } />
 
-          {/* Protected Home Logic */}
           <Route path="/home" element={
-            session && hasProfile === true ? (
+            session && hasProfile ? (
               <motion.div 
                 key="home-content" 
                 initial={{ opacity: 0 }} 
                 animate={{ opacity: 1 }} 
-                transition={{ duration: 0.5 }}
                 style={{ width: '100%' }}
               >
                 <Home />
@@ -135,9 +112,8 @@ function App() {
             )
           } />
 
-          {/* Global Catch-all Redirect */}
           <Route path="*" element={
-            <Navigate to={!session ? "/" : (hasProfile === true ? "/home" : "/onboarding")} replace />
+            <Navigate to={!session ? "/" : (hasProfile ? "/home" : "/onboarding")} replace />
           } />
         </Routes>
       </AnimatePresence>

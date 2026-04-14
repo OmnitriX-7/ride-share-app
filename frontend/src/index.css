@@ -7,19 +7,20 @@
   --text-main: #0f172a;
   --text-secondary: #64748b;
   --border-subtle: #e2e8f0;
-  --input-bg: #ffffff; /* Changed slightly to stand out from bg-main */
+  --input-bg: #ffffff; 
   --accent-primary: #2563eb;
   --accent-hover: #1d4ed8;
 }
 
 /* 2. Global Dark Mode Overrides */
-.dark, body.dark {
-  --bg-main: #020617 !important;
-  --card-bg: #0f172a !important;
-  --text-main: #f8fafc !important;
-  --text-secondary: #94a3b8 !important;
-  --border-subtle: #1e293b !important;
-  --input-bg: #1e293b !important;
+/* Note: Added .dark-theme to match your React useEffect logic */
+body.dark, .dark, body.dark-theme {
+  --bg-main: #020617;
+  --card-bg: #0f172a;
+  --text-main: #f8fafc;
+  --text-secondary: #94a3b8;
+  --border-subtle: #1e293b;
+  --input-bg: #1e293b;
 }
 
 * {
@@ -27,65 +28,68 @@
   padding: 0;
   box-sizing: border-box;
   font-family: 'Inter', sans-serif;
-  /* Sync background and text transitions so they don't ghost */
-  transition: background-color 0.3s ease, color 0.2s ease, border-color 0.2s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 3. The Core Background Fix */
+/* 3. The Core Background Fix & Performance-Safe Transitions */
+/* We only transition the major elements, not every microscopic span/icon */
+body, #root, .home-wrapper, .panel-card, .menu-card, input, select, textarea {
+  transition: background-color 0.3s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
 body {
-  background-color: var(--bg-main) !important;
-  color: var(--text-main) !important;
+  background-color: var(--bg-main);
+  color: var(--text-main);
   overflow-x: hidden;
   min-height: 100vh;
 }
 
 #root, .home-wrapper {
-  background-color: var(--bg-main) !important;
+  background-color: var(--bg-main);
   min-height: 100vh;
 }
 
-/* --- 4. THE BUTTON FIX (Fixes invisible text) --- */
+/* --- 4. BUTTONS --- */
 .search-btn {
-  background-color: var(--accent-primary) !important;
-  color: #ffffff !important; /* Forces text to stay white always */
-  font-weight: 700 !important;
-  border: none !important;
+  background-color: var(--accent-primary);
+  color: #ffffff; 
+  font-weight: 700;
+  border: none;
   cursor: pointer;
 }
 
 .search-btn:hover {
-  background-color: var(--accent-hover) !important;
+  background-color: var(--accent-hover);
 }
 
-/* --- 5. THE INPUT FIX (Fixes background mismatch) --- */
+/* --- 5. INPUTS --- */
 input, select, textarea {
-  background-color: var(--input-bg) !important;
-  color: var(--text-main) !important;
-  border: 1.5px solid var(--border-subtle) !important;
+  background-color: var(--input-bg);
+  color: var(--text-main);
+  border: 2px solid var(--border-subtle); /* Changed from 1.5px to prevent pixel blurring */
   outline: none;
 }
 
 input::placeholder {
-  color: var(--text-secondary) !important;
+  color: var(--text-secondary);
   opacity: 0.7;
 }
 
 /* --- 6. MISC COMPONENTS --- */
 .panel-card, .menu-card {
-  background-color: var(--card-bg) !important;
-  border: 1px solid var(--border-subtle) !important;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-subtle);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  color: var(--text-main) !important;
+  color: var(--text-main);
 }
 
-/* --- 7. PHONE INPUT FIX --- */
+/* --- 7. PHONE INPUT --- */
 .PhoneInputInput {
-  background: transparent !important;
-  color: var(--text-main) !important;
-  border: none !important;
+  background: transparent;
+  color: var(--text-main);
+  border: none;
 }
 
 .PhoneInputCountrySelect {
-  color: var(--text-main) !important;
+  color: var(--text-main);
 }
