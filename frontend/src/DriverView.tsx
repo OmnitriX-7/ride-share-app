@@ -1,11 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Power, Star, TrendingUp, Navigation, Activity, MapPin, CarFront, X, Check, Clock } from 'lucide-react';
+import { Power, Star, TrendingUp, Navigation, CarFront, Clock } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useUserStore } from './store';
 import RiderMap from './RiderMap'; 
 import RequestCard from './RequestCard'; 
 import './RiderView.css'; 
+
+const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
 
 const DriverView = () => {
   const { showToast } = useUserStore();
@@ -144,6 +153,15 @@ const DriverView = () => {
 
   const finishRide = async () => {
     if (!activeRide?.id || !driverId) return;
+
+    // Basic proximity check before allowing "Complete Ride"
+    if (currentLocation) {
+      const dist = getDistanceFromLatLonInKm(currentLocation.lat, currentLocation.lng, activeRide.dest_lat, activeRide.dest_lng);
+      if (dist > 0.5) { // 500 meters
+        showToast("You are too far from the destination to complete the ride.");
+        return;
+      }
+    }
 
     // 1. Update Trip Status
     const { error: dispatchErr } = await supabase

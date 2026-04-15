@@ -116,10 +116,10 @@ export default function Auth() {
             <Car size={28} strokeWidth={2.5} />
           </div>
           <h2 style={{ margin: '0 0 8px 0', fontSize: '24px', fontWeight: '800', color: '#0f172a' }}>
-            {isLogin ? 'Welcome back' : 'Join CampusRide'}
+            {isLogin ? 'Welcome back' : 'Join Shyft'}
           </h2>
           <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
-            {isLogin ? 'Enter your credentials to continue' : 'Sign up to start saving on campus rides'}
+            {isLogin ? 'Enter your credentials to continue' : 'Sign up to start saving on rides with Shyft'}
           </p>
         </div>
         
@@ -234,7 +234,7 @@ export default function Auth() {
 
         <div style={{ marginTop: '32px', textAlign: 'center' }}>
           <p style={{ fontSize: '14px', color: '#64748b' }}>
-            {isLogin ? "New to CampusRide?" : "Already have an account?"}
+            {isLogin ? "New to Shyft?" : "Already have an account?"}
             <button 
               onClick={toggleAuthMode} 
               style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: '700', marginLeft: '6px' }}

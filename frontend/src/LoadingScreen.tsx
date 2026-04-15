@@ -36,7 +36,7 @@ const LoadingScreen = () => {
           <motion.div 
             initial={{ width: "0%" }}
             animate={{ width: "100%" }}
-            transition={{ duration: 3, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 2, ease: [0.16, 1, 0.3, 1] }}
             style={{ height: '100%', backgroundColor: '#2563eb' }}
           />
         </div>
@@ -45,7 +45,7 @@ const LoadingScreen = () => {
         <motion.div
           initial={{ x: 0 }}
           animate={{ x: 248 }} 
-          transition={{ duration: 3, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 2, ease: [0.16, 1, 0.3, 1] }}
           style={{ position: 'absolute', top: '-35px' }}
         >
           <motion.div

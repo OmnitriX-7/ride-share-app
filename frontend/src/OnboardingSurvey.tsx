@@ -122,6 +122,10 @@ export default function OnboardingSurvey() {
         
         if (updateErr) throw updateErr;
 
+        // Fill progress bar to 100% and wait for animation to finish
+        setStep(4);
+        await new Promise(resolve => setTimeout(resolve, 600));
+
         setProfile({
           id: user.id,
           full_name: fullname.trim(),
@@ -170,6 +174,9 @@ export default function OnboardingSurvey() {
           }).eq('id', user.id);
         });
       }
+
+      // Brief pause so the user sees the progress bar reach completion
+      await new Promise(resolve => setTimeout(resolve, 600));
 
       setProfile({
         id: user.id,

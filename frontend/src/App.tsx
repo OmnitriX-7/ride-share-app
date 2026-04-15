@@ -40,6 +40,8 @@ function App() {
 
   useEffect(() => {
     const initApp = async () => {
+      // Ensure splash screen shows for at least 2 seconds to match animation
+      const minLoadingTime = new Promise(resolve => setTimeout(resolve, 2000));
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         
@@ -53,6 +55,7 @@ function App() {
       } catch (error) {
         console.error(error);
       } finally {
+        await minLoadingTime;
         setIsInitialLoading(false);
       }
     };
@@ -62,8 +65,10 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (event === 'SIGNED_IN' && currentSession) {
         setIsInitialLoading(true);
+        const minLoadingTime = new Promise(resolve => setTimeout(resolve, 2000));
         setSession(currentSession);
         await fetchAndSyncProfile(currentSession.user.id);
+        await minLoadingTime;
         setIsInitialLoading(false);
       } else if (event === 'SIGNED_OUT') {
         setProfile(null);
@@ -72,6 +77,7 @@ function App() {
         setIsInitialLoading(false);
       } else if (currentSession) {
         setSession(currentSession);
+        setIsInitialLoading(false);
       }
     });
 

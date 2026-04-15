@@ -11,12 +11,10 @@ const Home = () => {
   const { profile, showToast } = useUserStore();
   // Initialize mode based on database role
   const [isDriverMode, setIsDriverMode] = useState(profile?.role === 'driver');
-  const [loading, setLoading] = useState(!profile);
 
   useEffect(() => {
     if (profile) {
       setIsDriverMode(profile.role === 'driver');
-      setLoading(false);
     }
   }, [profile]);
 
@@ -50,7 +48,7 @@ const Home = () => {
     return () => { supabase.removeChannel(rewardChannel); };
   }, [profile?.id, showToast]);
 
-  if (loading) return <LoadingScreen />;
+  if (!profile) return <LoadingScreen />;
 
   return (
     <div 
@@ -66,10 +64,7 @@ const Home = () => {
       }}
     >
       <div style={{ position: 'sticky', top: 0, zIndex: 1000 }}>
-        <Navbar 
-          isDriverMode={isDriverMode} 
-          setIsDriverMode={handleToggleMode} 
-        />
+        <Navbar />
       </div>
 
       <main style={{ width: '100%', minHeight: 'calc(100vh - 80px)' }}>

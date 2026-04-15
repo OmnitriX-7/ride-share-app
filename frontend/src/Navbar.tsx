@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient'; 
 import { useUserStore } from './store'; // Added store import
 
-const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
+const Navbar = () => {
   const { profile, setProfile } = useUserStore(); // Pulling profile from store
   const [isOpen, setIsOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -26,10 +26,10 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const referralLink = `${window.location.origin}/auth?ref=${user.id}`;
+      const referralLink = `${window.location.origin}/?ref=${user.id}`;
       const shareData = {
-        title: 'Join CampusRide',
-        text: 'Use my link to join CampusRide and we both get ride discounts!',
+        title: 'Join Shyft',
+        text: 'Use my link to join Shyft and we both get ride discounts!',
         url: referralLink,
       };
 
@@ -69,8 +69,8 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
     <header style={headerStyle}>
       <div style={logoContainerStyle}>
         <div style={logoIconStyle}><Car size={24} strokeWidth={2.5} /></div>
-        <span style={{ fontWeight: '800', fontSize: '20px', color: 'var(--text-main)' }}>
-          Campus<span style={{ color: '#2563eb' }}>Ride</span>
+        <span style={{ fontWeight: '800', fontSize: '22px', color: '#2563eb' }}>
+          Shyft
         </span>
       </div>
 
@@ -103,7 +103,7 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
                        {profile?.full_name || 'User'} 
                      </div>
                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                       {profile?.role === 'driver' ? 'Verified Driver' : 'Campus Rider'}
+                       {profile?.role === 'driver' ? 'Verified Driver' : 'Shyft Rider'}
                      </div>
                    </div>
                    <ChevronRight size={16} color="#cbd5e1" />
@@ -112,16 +112,6 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
                 <div style={listStyle}>
                   <MenuButton icon={<Trophy size={18}/>} label="Leaderboard" />
                   <MenuButton icon={<CreditCard size={18}/>} label="Payments" />
-                  
-                  {/* The Role-Switch Button */}
-                  <MenuButton 
-                    icon={<RefreshCw size={18} color="#2563eb"/>} 
-                    label={isDriverMode ? "Switch to Rider" : "Switch to Driver"} 
-                    onClick={() => { 
-                      setIsDriverMode(!isDriverMode); 
-                      setIsOpen(false); 
-                    }}
-                  />
 
                   <div style={toggleItemStyle}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -133,7 +123,7 @@ const Navbar = ({ isDriverMode, setIsDriverMode }: any) => {
                     </button>
                   </div>
 
-                  <MenuButton icon={<Crown size={18} color="#eab308"/>} label="CampusRide Gold" />
+                  <MenuButton icon={<Crown size={18} color="#eab308"/>} label="Shyft Gold" />
                   
                   <MenuButton 
                     icon={<Users size={18} color="#2563eb"/>} 
