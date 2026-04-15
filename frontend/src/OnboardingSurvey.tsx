@@ -166,13 +166,24 @@ export default function OnboardingSurvey() {
 
       // 2. Request initial location for the drivers table
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-          await supabase.from('drivers').update({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            status: 'offline'
-          }).eq('id', user.id);
-        });
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+          });
+          
+          if (position) {
+            await supabase.from('drivers').update({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+              status: 'offline'
+            }).eq('id', user.id);
+          }
+        } catch (geoErr) {
+          console.warn("Geolocation failed or denied. Driver will start at default coordinates.", geoErr);
+          // We don't throw here so the user can still complete onboarding
+          // You might want to update status to 'offline' regardless
+          await supabase.from('drivers').update({ status: 'offline' }).eq('id', user.id);
+        }
       }
 
       // Brief pause so the user sees the progress bar reach completion
@@ -181,7 +192,7 @@ export default function OnboardingSurvey() {
       setProfile({
         id: user.id,
         full_name: fullname.trim(),
-        role: 'driver',
+        role: role as 'driver', // Use the state variable
         onboarded: true
       });
       setHasProfile(true); 
