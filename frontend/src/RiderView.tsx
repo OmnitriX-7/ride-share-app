@@ -47,16 +47,20 @@ const RiderView = () => {
 
   // --- THEME SYNC ---
   useEffect(() => {
-    setIsDarkMode(document.body.classList.contains('dark'));
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === 'class') {
-          setIsDarkMode(document.body.classList.contains('dark'));
-        }
-      });
+    const updateDarkMode = () => {
+      setIsDarkMode(document.body.classList.contains('dark'));
+    };
+
+    updateDarkMode();
+
+    const observer = new MutationObserver(() => {
+      updateDarkMode();
     });
-    observer.observe(document.body, { attributes: true });
-    return () => observer.disconnect();
+
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
   // --- MOUNT SYNC & RESTORE (The Refresh Fix) ---

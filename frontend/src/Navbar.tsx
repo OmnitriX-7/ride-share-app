@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  User, Trophy, CreditCard, RefreshCw, 
-  Crown, Users, Star, AlertTriangle, 
+  User, Trophy, CreditCard, 
+  Crown, Users, Star, 
   ShieldAlert, LogOut, ChevronRight,
   Moon, Sun, Car
 } from 'lucide-react';

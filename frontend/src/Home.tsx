@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from './supabaseClient';
 import { useUserStore } from './store'; 
@@ -19,13 +19,6 @@ const Home = () => {
   }, [profile]);
 
   // Handle manual toggle from Navbar
-  const handleToggleMode = (requestedMode: boolean) => {
-    if (requestedMode && profile?.role !== 'driver') {
-      showToast("You need to register as a driver to access this mode.");
-      return;
-    }
-    setIsDriverMode(requestedMode);
-  };
 
   // Real-time listener for Rewards/Coupons
   useEffect(() => {
