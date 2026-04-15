@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Gift, Sparkles, Bell, Info } from 'lucide-react';
 import { useUserStore } from './store';
