@@ -17,7 +17,7 @@ const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon
 };
 
 const DriverView = () => {
-  const { showToast } = useUserStore();
+  const { showToast, setProfile } = useUserStore();
   const [isOnline, setIsOnline] = useState(false);
   const [driverId, setDriverId] = useState<string | null>(null);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
@@ -107,12 +107,14 @@ const DriverView = () => {
     }
 
     const channel = supabase
-      .channel(`driver_inbox_${driverId}`)
+      .channel('ride_requests')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'ride_dispatches', filter: `driver_id=eq.${driverId}` },
+        { event: 'INSERT', schema: 'public', table: 'ride_dispatches' },
         (payload) => {
-          if (payload.new.status === 'pending') {
+          console.log("New Dispatch Event:", payload);
+          // Filter logic moved inside to ensure reliability
+          if (payload.new.status === 'pending' && payload.new.driver_id === driverId) {
             setIncomingRequests((prev) => [...prev, payload.new]);
             showToast("New Ride Request Inbound!");
           }
@@ -120,9 +122,9 @@ const DriverView = () => {
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'ride_dispatches', filter: `driver_id=eq.${driverId}` },
+        { event: 'UPDATE', schema: 'public', table: 'ride_dispatches' },
         (payload) => {
-          if (['cancelled', 'timeout'].includes(payload.new.status)) {
+          if (payload.new.driver_id === driverId && ['cancelled', 'timeout'].includes(payload.new.status)) {
             setIncomingRequests((prev) => prev.filter(req => req.id !== payload.new.id));
           }
         }
@@ -183,6 +185,10 @@ const DriverView = () => {
       .eq('id', driverId);
 
     if (!driverErr) {
+      // Re-fetch profile to sync XP and Level updates from the database
+      const { data: pData } = await supabase.from('profiles').select('*').eq('id', driverId).single();
+      if (pData) setProfile(pData);
+
       setActiveRide(null);
       setIsOnline(true);
       showToast("Trip completed! You are back online.");

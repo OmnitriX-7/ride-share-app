@@ -8,6 +8,8 @@ import OnboardingSurvey from './OnboardingSurvey';
 import Home from './Home';
 import LoadingScreen from './LoadingScreen';
 import NotificationToast from './NotificationToast';
+import ProfileDashboard from './ProfileDashboard';
+import Navbar from './Navbar';
 
 function App() {
   const { setProfile, hasProfile, setHasProfile } = useUserStore();
@@ -112,6 +114,24 @@ function App() {
                 style={{ width: '100%' }}
               >
                 <Home />
+              </motion.div>
+            ) : (
+              <Navigate to={session ? "/onboarding" : "/"} replace />
+            )
+          } />
+
+          <Route path="/profile" element={
+            session && hasProfile ? (
+              <motion.div 
+                key="profile-content" 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                style={{ width: '100%' }}
+              >
+                <div style={{ position: 'sticky', top: 0, zIndex: 1000 }}>
+                  <Navbar />
+                </div>
+                <ProfileDashboard />
               </motion.div>
             ) : (
               <Navigate to={session ? "/onboarding" : "/"} replace />

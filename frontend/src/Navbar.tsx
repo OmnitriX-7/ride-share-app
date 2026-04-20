@@ -58,16 +58,20 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     if (window.confirm("Are you sure you want to log out?")) {
+      localStorage.removeItem('active_ride_id');
       await supabase.auth.signOut();
       setProfile(null); // Clear store on logout
-      localStorage.clear();
       navigate('/', { replace: true });
     }
   };
 
   return (
     <header style={headerStyle}>
-      <div style={logoContainerStyle}>
+      <div 
+        style={{ ...logoContainerStyle, cursor: 'pointer' }} 
+        onClick={() => navigate('/home')}
+        title="Go to Home"
+      >
         <div style={logoIconStyle}><Car size={24} strokeWidth={2.5} /></div>
         <span style={{ fontWeight: '800', fontSize: '22px', color: '#2563eb' }}>
           Shyft
@@ -78,9 +82,13 @@ const Navbar = () => {
         <motion.button 
           whileTap={{ scale: 0.95 }}
           onClick={() => setIsOpen(!isOpen)}
-          style={pfpButtonStyle}
+          style={{ ...pfpButtonStyle, overflow: 'hidden' }}
         >
-          <User size={22} color="white" />
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <User size={22} color="white" />
+          )}
         </motion.button>
 
         <AnimatePresence>
@@ -97,7 +105,13 @@ const Navbar = () => {
                   style={menuHeaderStyle} 
                   onClick={() => { navigate('/profile'); setIsOpen(false); }}
                 >
-                   <div style={largePfpStyle}><User size={24} color="#2563eb"/></div>
+                   <div style={{ ...largePfpStyle, borderRadius: '50%', overflow: 'hidden' }}>
+                     {profile?.avatar_url ? (
+                       <img src={profile.avatar_url} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                     ) : (
+                       <User size={24} color="#2563eb"/>
+                     )}
+                   </div>
                    <div style={{ flex: 1 }}>
                      <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-main)' }}>
                        {profile?.full_name || 'User'} 

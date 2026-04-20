@@ -1,11 +1,20 @@
 import { create } from 'zustand';
 
-interface UserProfile {
+export interface UserProfile {
   id: string;
   full_name?: string;
   role?: 'rider' | 'driver';
   onboarded?: boolean;
   phone_number?: string;
+  email?: string;
+  age?: number | null;
+  gender?: string | null;
+  hometown?: string | null;
+  bio?: string | null;
+  avatar_url?: string | null;
+  created_at?: string;
+  exp?: number;
+  level?: number;
 }
 
 interface UserState {

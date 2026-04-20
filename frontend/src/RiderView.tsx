@@ -16,8 +16,8 @@ const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon
 };
 
 const RiderView = () => {
-  const { showToast } = useUserStore();
-  
+  const { showToast, setProfile } = useUserStore();
+
   // --- CORE STATES ---
   const [isRestoring, setIsRestoring] = useState(true); // NEW: Prevents UI flicker on refresh
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -117,11 +117,17 @@ const RiderView = () => {
       try {
         const silLat = 24.7577, silLon = 92.7923; // NIT Silchar coords
         const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=${silLat}&lon=${silLon}&limit=5`;
-        const res = await fetch(url);
+        const res = await fetch(url, {
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'omit',
+          headers: { 'Accept': 'application/json' }
+        });
         const data = await res.json();
         
-        const formatted = data.features.map((f: any) => ({
-          id: f.properties.osm_id || Math.random(),
+        const formatted = data.features.map((f: any, index: number) => ({
+          // Combine OSM ID, type, and index to ensure absolute uniqueness
+          id: `${f.properties.osm_id || 'item'}-${f.properties.osm_type || ''}-${index}`,
           name: f.properties.name || f.properties.street || "Unknown Place",
           fullName: [f.properties.name, f.properties.city, f.properties.state].filter(Boolean).join(", "),
           lat: f.geometry.coordinates[1],
@@ -290,6 +296,14 @@ const RiderView = () => {
           } else if (newStatus === 'completed') {
             setStep(5);
             localStorage.removeItem('active_ride_id'); // Ride is over, wipe memory
+
+            // Re-fetch profile to sync XP and Level updates from the database
+            supabase.auth.getUser().then(({ data: { user } }) => {
+              if (user) {
+                supabase.from('profiles').select('*').eq('id', user.id).single()
+                  .then(({ data: pData }) => { if (pData) setProfile(pData); });
+              }
+            });
           } else if (newStatus === 'cancelled' || newStatus === 'timeout') {
             setStep(1);
             setCurrentDispatchId(null);
