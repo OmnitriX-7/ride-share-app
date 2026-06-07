@@ -48,7 +48,7 @@ const RiderView = () => {
   // --- THEME SYNC ---
   useEffect(() => {
     const updateDarkMode = () => {
-      setIsDarkMode(document.body.classList.contains('dark'));
+      setIsDarkMode(document.documentElement.classList.contains('dark'));
     };
 
     updateDarkMode();
@@ -57,7 +57,7 @@ const RiderView = () => {
       updateDarkMode();
     });
 
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => {
       observer.disconnect();
     };
@@ -255,7 +255,7 @@ const RiderView = () => {
       showToast("Failed to request ride.");
       setIsRequesting(false);
     } else {
-      setCurrentDispatchId(data.id);
+      setCurrentDispatchId(data.id); // Ensure currentDispatchId is set on success
       localStorage.setItem('active_ride_id', data.id); // Save to local storage
       setStep(3);
       setIsRequesting(false);
@@ -268,9 +268,9 @@ const RiderView = () => {
       await supabase.from('ride_dispatches').update({ status: 'cancelled' }).eq('id', currentDispatchId);
       setCurrentDispatchId(null);
       localStorage.removeItem('active_ride_id');
+      setSelectedDriver(null); // Clear selected driver on cancel
     }
     setStep(2);
-    setSelectedDriver(null);
   };
 
   // --- MASTER REAL-TIME SUBSCRIPTION ---

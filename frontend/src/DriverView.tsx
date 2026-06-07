@@ -27,9 +27,9 @@ const DriverView = () => {
 
   // --- 1. THEME SYNC ---
   useEffect(() => {
-    setIsDarkMode(document.body.classList.contains('dark'));
-    const observer = new MutationObserver(() => setIsDarkMode(document.body.classList.contains('dark')));
-    observer.observe(document.body, { attributes: true });
+    setIsDarkMode(document.documentElement.classList.contains('dark'));
+    const observer = new MutationObserver(() => setIsDarkMode(document.documentElement.classList.contains('dark')));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, []);
 
@@ -39,7 +39,7 @@ const DriverView = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setDriverId(user.id);
-        const { data: driverData } = await supabase.from('drivers').select('status').eq('id', user.id).single();
+        const { data: driverData } = await supabase.from('drivers').select('status').eq('id', user.id).maybeSingle();
         
         if (driverData?.status === 'busy') {
           const { data: rideData } = await supabase

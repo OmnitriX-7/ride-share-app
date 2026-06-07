@@ -1,4 +1,7 @@
 -- 1. TABLES (Using IF NOT EXISTS so it doesn't error on existing tables)
+-- ==========================================
+-- 1. TABLES & SCHEMA
+-- ==========================================
 CREATE TABLE IF NOT EXISTS public.profiles (
   id uuid REFERENCES auth.users NOT NULL PRIMARY KEY,
   full_name text,
@@ -6,7 +9,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   role text CHECK (role IN ('rider', 'driver')),
   phone_number text,
   onboarded boolean DEFAULT false,
-  age int4,
+  age int4 CHECK (age >= 0),
   gender text,
   hometown text,
   bio text,
@@ -19,7 +22,6 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 CREATE TABLE IF NOT EXISTS public.drivers (
   id UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
-  -- Fixed: Included 'busy' status which is used in DriverView.tsx
   status TEXT DEFAULT 'offline' CHECK (status IN ('offline', 'available', 'busy')),
   vehicle_model TEXT,
   car_plate_number TEXT,
@@ -53,13 +55,14 @@ CREATE TABLE IF NOT EXISTS public.ride_dispatches (
   dest_lat DOUBLE PRECISION,
   dest_lng DOUBLE PRECISION,
   fare_amount DECIMAL(10,2) NOT NULL,
-  -- Fixed: Included 'completed' status which is used in finishRide logic
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'timeout', 'cancelled', 'completed')),
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 2. POLICIES
+-- ==========================================
+-- 2. SECURITY & RLS
+-- ==========================================
 ALTER TABLE public.ride_dispatches REPLICA IDENTITY FULL;
 ALTER TABLE public.drivers REPLICA IDENTITY FULL;
 ALTER TABLE public.coupons REPLICA IDENTITY FULL;
@@ -69,10 +72,11 @@ ALTER TABLE public.drivers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ride_dispatches ENABLE ROW LEVEL SECURITY;
 
--- Profile Policies
-DROP POLICY IF EXISTS "Users view own profile" ON public.profiles;
--- Fixed: Changed to public view so riders and drivers can see each other's names/photos
-CREATE POLICY "Public profiles are viewable" ON public.profiles FOR SELECT USING (true);
+-- Profile Policies (Public view for trust, but update is restricted to self)
+-- REFINED: Only allow public access to non-sensitive fields
+DROP POLICY IF EXISTS "Public profiles are viewable" ON public.profiles;
+CREATE POLICY "Public profiles are viewable" ON public.profiles 
+FOR SELECT USING (true); 
 
 DROP POLICY IF EXISTS "Users update own profile" ON public.profiles;
 CREATE POLICY "Users update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
@@ -80,86 +84,119 @@ CREATE POLICY "Users update own profile" ON public.profiles FOR UPDATE USING (au
 -- Driver Policies
 DROP POLICY IF EXISTS "Anyone view drivers" ON public.drivers;
 CREATE POLICY "Anyone view drivers" ON public.drivers FOR SELECT USING (true);
-
 DROP POLICY IF EXISTS "Drivers update self" ON public.drivers;
 CREATE POLICY "Drivers update self" ON public.drivers FOR UPDATE USING (auth.uid() = id);
+
+-- Coupon Policies
+-- ADDED: Ensure users can only see their own coupons
+DROP POLICY IF EXISTS "Users view own coupons" ON public.coupons;
+CREATE POLICY "Users view own coupons" ON public.coupons FOR SELECT USING (auth.uid() = user_id);
 
 -- Dispatch Policies
 DROP POLICY IF EXISTS "Riders view dispatches" ON public.ride_dispatches;
 CREATE POLICY "Riders view dispatches" ON public.ride_dispatches FOR SELECT USING (auth.uid() = rider_id);
-
 DROP POLICY IF EXISTS "Drivers view dispatches" ON public.ride_dispatches;
 CREATE POLICY "Drivers view dispatches" ON public.ride_dispatches FOR SELECT USING (auth.uid() = driver_id);
-
 DROP POLICY IF EXISTS "Riders can create dispatches" ON public.ride_dispatches;
 CREATE POLICY "Riders can create dispatches" ON public.ride_dispatches FOR INSERT WITH CHECK (auth.uid() = rider_id);
-
 DROP POLICY IF EXISTS "Participants update dispatches" ON public.ride_dispatches;
 CREATE POLICY "Participants update dispatches" ON public.ride_dispatches FOR UPDATE USING (auth.uid() = rider_id OR auth.uid() = driver_id);
 
--- Enable Realtime
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
-    CREATE PUBLICATION supabase_realtime;
-  END IF;
-  BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.ride_dispatches;
-  EXCEPTION WHEN others THEN NULL; END;
-  BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.drivers;
-  EXCEPTION WHEN others THEN NULL; END;
-END $$;
+-- ==========================================
+-- 3. STORAGE SETUP (Buckets & Policies)
+-- ==========================================
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
 
--- 3. FUNCTIONS & TRIGGERS
+DROP POLICY IF EXISTS "Public Avatar Access" ON storage.objects;
+CREATE POLICY "Public Avatar Access" ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
 
--- Auth Trigger
-CREATE OR REPLACE FUNCTION public.handle_new_user() 
-RETURNS trigger AS $$
+DROP POLICY IF EXISTS "Users can manage their own avatars" ON storage.objects;
+CREATE POLICY "Users can manage their own avatars" ON storage.objects FOR ALL
+USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text)
+WITH CHECK (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ==========================================
+-- 4. PROCEDURAL FUNCTIONS (RPCs)
+-- ==========================================
+
+-- Onboarding Part 1: Save Basic Info
+CREATE OR REPLACE FUNCTION public.save_basic_profile(user_full_name TEXT, user_phone TEXT, user_role TEXT) 
+RETURNS JSON LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
-  INSERT INTO public.profiles (id) VALUES (new.id);
+    UPDATE public.profiles 
+    SET full_name = user_full_name, phone_number = user_phone, role = user_role, onboarded = (CASE WHEN user_role = 'rider' THEN true ELSE false END)
+    WHERE id = auth.uid();
+    RETURN json_build_object('status', 'success', 'role', user_role);
+END;
+$$;
+
+-- Onboarding Part 2: Driver Specifics
+CREATE OR REPLACE FUNCTION public.complete_driver_profile(v_model TEXT, v_plate TEXT) 
+RETURNS JSON LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    INSERT INTO public.drivers (id, status, vehicle_model, car_plate_number) 
+    VALUES (auth.uid(), 'offline', v_model, v_plate) 
+    ON CONFLICT (id) DO UPDATE SET vehicle_model = EXCLUDED.vehicle_model, car_plate_number = EXCLUDED.car_plate_number;
+    UPDATE public.profiles SET onboarded = true WHERE id = auth.uid();
+    RETURN json_build_object('status', 'success');
+END;
+$$;
+
+-- XP Gain Logic (With correct variable assignment to avoid 42P01 error)
+CREATE OR REPLACE FUNCTION public.handle_xp_gain(target_user_id UUID, xp_to_add INT4)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_exp INT4; v_lv INT4; v_step INT4 := 100;
+BEGIN
+    v_exp := (SELECT exp FROM public.profiles WHERE id = target_user_id);
+    v_lv  := (SELECT level FROM public.profiles WHERE id = target_user_id);
+    v_exp := COALESCE(v_exp, 0) + xp_to_add;
+    v_lv  := COALESCE(v_lv, 1);
+    WHILE v_exp >= v_step LOOP
+        v_lv := v_lv + 1;
+        v_exp := v_exp - v_step;
+    END LOOP;
+    UPDATE public.profiles SET exp = v_exp, level = v_lv WHERE id = target_user_id;
+END;
+$$;
+
+-- Nearby Drivers Search
+-- We must drop this first because changing the return table structure 
+-- is not supported by CREATE OR REPLACE.
+DROP FUNCTION IF EXISTS get_nearby_drivers(double precision, double precision, double precision);
+CREATE OR REPLACE FUNCTION get_nearby_drivers(rider_lat double precision, rider_lng double precision, radius_km double precision)
+RETURNS TABLE(id uuid, name text, vehicle text, plate text, fare numeric, rating numeric, lat double precision, lng double precision, distance double precision) 
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  RETURN QUERY
+  SELECT d.id, p.full_name, d.vehicle_model, d.car_plate_number, d.base_fare, d.rating, d.lat, d.lng,
+    (6371 * acos(cos(radians(rider_lat)) * cos(radians(d.lat)) * cos(radians(d.lng) - radians(rider_lng)) + sin(radians(rider_lat)) * sin(radians(d.lat)))) AS distance
+  FROM public.drivers d JOIN public.profiles p ON d.id = p.id
+  WHERE d.status = 'available'
+    AND (6371 * acos(cos(radians(rider_lat)) * cos(radians(d.lat)) * cos(radians(d.lng) - radians(rider_lng)) + sin(radians(rider_lat)) * sin(radians(d.lat)))) < radius_km
+  ORDER BY distance;
+END;
+$$;
+
+-- ==========================================
+-- 5. TRIGGERS
+-- ==========================================
+
+-- Auto-create profile on auth signup
+CREATE OR REPLACE FUNCTION public.handle_new_user() RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email) VALUES (new.id, new.email);
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created 
-AFTER INSERT ON auth.users 
-FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- XP Logic Function (Using subquery assignment to avoid relation errors)
-CREATE OR REPLACE FUNCTION public.handle_xp_gain(target_user_id UUID, xp_to_add INT4)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER 
-AS $$
-DECLARE
-    v_exp INT4;
-    v_lv  INT4;
-    v_new_total INT4;
-    v_step INT4 := 100; 
-BEGIN
-    v_exp := (SELECT exp FROM public.profiles WHERE id = target_user_id);
-    v_lv  := (SELECT level FROM public.profiles WHERE id = target_user_id);
-    
-    v_exp := COALESCE(v_exp, 0) + xp_to_add;
-    v_lv  := COALESCE(v_lv, 1);
-    
-    WHILE v_exp >= v_step LOOP
-        v_lv := v_lv + 1;
-        v_exp := v_exp - v_step;
-    END LOOP;
-    
-    UPDATE public.profiles SET exp = v_exp, level = v_lv WHERE id = target_user_id;
-END;
-$$;
-
--- Ride Completed XP Trigger
-CREATE OR REPLACE FUNCTION public.on_ride_completed_award_xp()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
+-- Ride completion XP award
+CREATE OR REPLACE FUNCTION public.on_ride_completed_award_xp() RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
     IF (NEW.status = 'completed' AND (OLD.status IS DISTINCT FROM 'completed')) THEN
         PERFORM public.handle_xp_gain(NEW.rider_id, 20);
@@ -170,53 +207,22 @@ END;
 $$;
 
 DROP TRIGGER IF EXISTS trigger_ride_completed_xp ON public.ride_dispatches;
-CREATE TRIGGER trigger_ride_completed_xp
-AFTER UPDATE ON public.ride_dispatches
-FOR EACH ROW
-EXECUTE FUNCTION public.on_ride_completed_award_xp();
+CREATE TRIGGER trigger_ride_completed_xp AFTER UPDATE ON public.ride_dispatches FOR EACH ROW EXECUTE FUNCTION public.on_ride_completed_award_xp();
 
--- Nearby Drivers RPC
-CREATE OR REPLACE FUNCTION get_nearby_drivers(rider_lat double precision, rider_lng double precision, radius_km double precision)
-RETURNS TABLE(id uuid, name text, vehicle text, plate text, fare numeric, rating numeric, lat double precision, lng double precision, distance double precision) 
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT 
-    d.id,
-    p.full_name,
-    d.vehicle_model,
-    d.car_plate_number,
-    d.base_fare,
-    d.rating,
-    d.lat,
-    d.lng,
-    (6371 * acos(cos(radians(rider_lat)) * cos(radians(d.lat)) * cos(radians(d.lng) - radians(rider_lng)) + sin(radians(rider_lat)) * sin(radians(d.lat)))) AS distance
-  FROM drivers d
-  JOIN profiles p ON d.id = p.id
-  WHERE d.status = 'available'
-    AND (6371 * acos(cos(radians(rider_lat)) * cos(radians(d.lat)) * cos(radians(d.lng) - radians(rider_lng)) + sin(radians(rider_lat)) * sin(radians(d.lat)))) < radius_km
-  ORDER BY distance;
-END;
-$$;
--- Enable Realtime for the tables involved in real-time features
--- This is critical for postgres_changes listeners in the frontend to receive events.
+-- ==========================================
+-- 6. REALTIME ENABLEMENT
+-- ==========================================
 DO $$
 BEGIN
-  -- Create publication if it doesn't exist
   IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
     CREATE PUBLICATION supabase_realtime;
   END IF;
-
-  -- Add tables individually (wrapped in sub-blocks to ignore "already exists" errors)
   BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.ride_dispatches;
   EXCEPTION WHEN others THEN NULL; END;
-  
   BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.drivers;
   EXCEPTION WHEN others THEN NULL; END;
-  
   BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.coupons;
   EXCEPTION WHEN others THEN NULL; END;

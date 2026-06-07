@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, Trophy, CreditCard, 
@@ -10,23 +10,29 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient'; 
 import { useUserStore } from './store'; // Added store import
 
+interface MenuButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+  isDestructive?: boolean;
+}
+
 const Navbar = () => {
   const { profile, setProfile } = useUserStore(); // Pulling profile from store
   const [isOpen, setIsOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  // Initialize state directly from current DOM/LocalStorage to prevent flicker
+  const [isDarkMode, setIsDarkMode] = useState(() => 
+    document.documentElement.classList.contains('dark') || localStorage.getItem('theme') === 'dark'
+  );
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const isDark = document.documentElement.classList.contains('dark');
-    setIsDarkMode(isDark);
-  }, []);
 
   const handleReferral = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // Use profile from store instead of an extra network call
+      const userId = profile?.id;
+      if (!userId) return;
 
-      const referralLink = `${window.location.origin}/?ref=${user.id}`;
+      const referralLink = `${window.location.origin}/?ref=${userId}`;
       const shareData = {
         title: 'Join Shyft',
         text: 'Use my link to join Shyft and we both get ride discounts!',
@@ -166,7 +172,7 @@ const Navbar = () => {
   );
 };
 
-const MenuButton = ({ icon, label, onClick, isDestructive }: any) => {
+const MenuButton = ({ icon, label, onClick, isDestructive }: MenuButtonProps) => {
   return (
     <button 
       onClick={onClick} 

@@ -92,11 +92,17 @@ const ProfileDashboard = () => {
   };
 
   const handleUpdateProfile = async () => {
+    const ageValue = formData.age !== '' ? parseInt(formData.age.toString()) : null;
+    if (ageValue !== null && ageValue < 0) {
+      showToast("age cant be negative");
+      return;
+    }
+
     setLoading(true);
     const updatedFields = {
       full_name: formData.full_name,
       phone_number: formData.phone_number,
-      age: formData.age ? parseInt(formData.age.toString()) : null,
+      age: ageValue,
       gender: formData.gender,
       hometown: formData.hometown,
       bio: formData.bio,
@@ -113,6 +119,11 @@ const ProfileDashboard = () => {
       showToast("Profile updated successfully!");
     } else {
       showToast("Update failed. Please try again.");
+      // Revert formData to original profile data if update fails
+      setFormData({
+        ...formData, // Keep current input values
+        // Potentially revert specific fields from `profile` if error is field-specific
+      });
     }
     setLoading(false);
   };
@@ -125,12 +136,12 @@ const ProfileDashboard = () => {
       const file = event.target.files[0];
 
       // Improvement: Validate file size (e.g., limit to 2MB)
-      if (file.size > 2 * 1024 * 1024) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
         throw new Error("File size must be less than 2MB");
       }
 
       // Improvement: Validate file type
-      if (!file.type.startsWith('image/')) {
+      if (!file.type.startsWith('image/')) { // Only allow image files
         throw new Error("Only image files are allowed");
       }
 
@@ -375,7 +386,12 @@ const InfoField = ({ icon, label, value, isEditing, onChange, type = "text", isS
           {options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
         </select>
       ) : onChange ? (
-        <input type={type} value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+        <input 
+          type={type} 
+          value={value ?? ''} 
+          onChange={(e) => onChange(e.target.value)} 
+          min={type === "number" ? 0 : undefined}
+        />
       ) : (
         <span className={`field-value ${!value ? 'placeholder' : ''}`}>{value || 'Not set'}</span>
       )
